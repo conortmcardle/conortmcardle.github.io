@@ -464,6 +464,18 @@
   font-style: italic;
 }
 
+.movie-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+.tv-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
 /* ── Utility ─────────────────────────────────────────────── */
 .no-data {
   color: var(--text-muted);

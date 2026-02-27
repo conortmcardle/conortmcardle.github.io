@@ -125,23 +125,35 @@ async function getConcurrentReleases(year, month, day) {
 }
 
 async function getTVPremieres(year, month, day) {
-  const pad = n => String(n).padStart(2, '0');
-  const dateStr = `${year}-${pad(month)}-${pad(day)}`;
-  return safeFetch(`https://api.tvmaze.com/schedule?date=${dateStr}&country=US`);
+  const pad    = n => String(n).padStart(2, '0');
+  const center = new Date(Date.UTC(year, month - 1, day));
+  const dates  = [];
+  for (let offset = -30; offset <= 30; offset++) {
+    const d = new Date(center);
+    d.setUTCDate(d.getUTCDate() + offset);
+    dates.push(`${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`);
+  }
+  const results = await Promise.all(
+    dates.map(ds => safeFetch(`https://api.tvmaze.com/schedule?date=${ds}&country=US`))
+  );
+  return results.filter(Boolean).flat();
 }
 
 async function getMovieReleases(year, month, day) {
-  const pad = n => String(n).padStart(2, '0');
-  const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+  const pad    = n => String(n).padStart(2, '0');
+  const center = new Date(Date.UTC(year, month - 1, day));
+  const start  = new Date(center); start.setUTCDate(start.getUTCDate() - 4);
+  const end    = new Date(center); end.setUTCDate(end.getUTCDate() + 4);
+  const fmtD   = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
   const query = `
-    SELECT DISTINCT ?film ?filmLabel ?directorLabel WHERE {
+    SELECT DISTINCT ?film ?filmLabel ?directorLabel ?date WHERE {
       ?film wdt:P31 wd:Q11424.
       ?film wdt:P577 ?date.
-      FILTER(STRSTARTS(STR(?date), "${dateStr}"))
+      FILTER(?date >= "${fmtD(start)}T00:00:00Z"^^xsd:dateTime && ?date <= "${fmtD(end)}T23:59:59Z"^^xsd:dateTime)
       OPTIONAL { ?film wdt:P57 ?director. }
       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
     }
-    LIMIT 10
+    LIMIT 20
   `;
   return safeFetch(
     `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(query)}`
@@ -272,14 +284,16 @@ function renderSongPanel(rec, release, wikiData) {
 
 function renderHistoryPanel(data, releaseYear) {
   const allEvents = data?.events ?? [];
-  const events = releaseYear
-    ? allEvents.filter(e => e.year === releaseYear)
-    : allEvents.slice(0, 5);
-
-  if (!events.length) {
+  if (!allEvents.length) {
     setHTML('panel-history-body', '<p class="no-data">No historical events found for this date.</p>');
     return;
   }
+
+  // Prioritise events from the release year, then fill up to 4 with events
+  // from other years on the same calendar date.
+  const fromYear = releaseYear ? allEvents.filter(e => e.year === releaseYear) : [];
+  const others   = releaseYear ? allEvents.filter(e => e.year !== releaseYear) : allEvents;
+  const events   = [...fromYear, ...others].slice(0, 4);
 
   const html = events.map(event => `
     <div class="history-event">
@@ -339,7 +353,7 @@ function renderTVPanel(data) {
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).slice(0, 8);
+  }).sort((a, b) => (a.airdate ?? '').localeCompare(b.airdate ?? '')).slice(0, 8);
 
   if (!premieres.length) {
     setHTML('panel-tv-body', '<p class="no-data">No TV premieres found for this date.</p>');
@@ -350,11 +364,13 @@ function renderTVPanel(data) {
     const show    = ep.show ?? {};
     const network = show.network?.name ?? show.webChannel?.name ?? '';
     const genres  = show.genres?.slice(0, 2).join(', ') ?? '';
+    const airdate = ep.airdate ? formatDate(ep.airdate) : '';
     return `
       <div class="tv-item">
         <div class="tv-title">${escHtml(show.name ?? ep.name)}</div>
         ${network ? `<div class="tv-network">${escHtml(network)}</div>` : ''}
         ${genres  ? `<div class="tv-genre">${escHtml(genres)}</div>`   : ''}
+        ${airdate ? `<div class="tv-date">${escHtml(airdate)}</div>`   : ''}
       </div>`;
   }).join('');
 
@@ -382,12 +398,15 @@ function renderMoviePanel(data) {
   }
 
   const html = movies.map(b => {
-    const title    = b.filmLabel?.value    ?? '';
+    const title    = b.filmLabel?.value     ?? '';
     const director = b.directorLabel?.value ?? '';
+    const rawDate  = b.date?.value          ?? '';
+    const dateStr  = rawDate ? formatDate(rawDate.slice(0, 10)) : '';
     return `
       <div class="movie-item">
         <div class="movie-title">${escHtml(title)}</div>
         ${director ? `<div class="movie-director">dir. ${escHtml(director)}</div>` : ''}
+        ${dateStr  ? `<div class="movie-date">${escHtml(dateStr)}</div>`           : ''}
       </div>`;
   }).join('');
 
