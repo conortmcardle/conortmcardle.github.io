@@ -26,10 +26,20 @@
       <p class="app-eyebrow">Song History App</p>
       <h1 class="app-title">WHEN IT<br>DROPPED</h1>
       <p class="app-desc">Search a song. See the world it was born into.</p>
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tab-song">SONG</button>
+        <button class="mode-tab" id="tab-date">DATE</button>
+      </div>
       <form id="search-form" class="search-form">
         <div class="search-fields">
           <input type="text" id="song-input" placeholder="Song title" autocomplete="off" required />
           <input type="text" id="artist-input" placeholder="Artist" autocomplete="off" required />
+          <button type="submit" class="btn btn-primary">GO</button>
+        </div>
+      </form>
+      <form id="date-form" class="search-form" hidden>
+        <div class="search-fields">
+          <input type="date" id="date-input" required />
           <button type="submit" class="btn btn-primary">GO</button>
         </div>
       </form>
@@ -57,7 +67,7 @@
 
       <div class="results-grid">
 
-        <div class="panel panel-gold">
+        <div class="panel panel-gold" id="panel-song-wrap">
           <div class="panel-title">THE SONG</div>
           <div class="panel-body" id="panel-song-body">
             <div class="loading">Loading…</div>
@@ -78,7 +88,7 @@
           </div>
         </div>
 
-        <div class="panel panel-orange">
+        <div class="panel panel-orange" id="panel-artist-wrap">
           <div class="panel-title">THE ARTIST</div>
           <div class="panel-body" id="panel-artist-body">
             <div class="loading">Loading…</div>

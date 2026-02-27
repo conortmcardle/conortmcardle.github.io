@@ -403,13 +403,21 @@ function renderMoviePanel(data) {
     return;
   }
 
-  const seen = new Set();
-  const movies = bindings.filter(b => {
+  // Merge duplicate rows (caused by DISTINCT + OPTIONAL combos in SPARQL)
+  // so poster/director from any row are preserved for each unique title.
+  const filmMap = new Map();
+  for (const b of bindings) {
     const title = b.filmLabel?.value;
-    if (!title || /^Q\d+$/.test(title) || seen.has(title)) return false;
-    seen.add(title);
-    return true;
-  }).slice(0, 8);
+    if (!title || /^Q\d+$/.test(title)) continue;
+    const prev = filmMap.get(title);
+    if (!prev) {
+      filmMap.set(title, { ...b });
+    } else {
+      if (!prev.poster?.value && b.poster?.value) prev.poster = b.poster;
+      if (!prev.directorLabel?.value && b.directorLabel?.value) prev.directorLabel = b.directorLabel;
+    }
+  }
+  const movies = [...filmMap.values()].slice(0, 8);
 
   if (!movies.length) {
     setHTML('panel-movies-body', '<p class="no-data">No movies found for this date.</p>');
@@ -461,7 +469,44 @@ function renderArtistPanel(mbData, wikiData) {
 
 // ── Core Flow ─────────────────────────────────────────────────────────────────
 
+function renderDateHeader(year, month, day) {
+  const pad = n => String(n).padStart(2, '0');
+  const dateStr = formatDate(`${year}-${pad(month)}-${pad(day)}`);
+  el('song-header').innerHTML = `
+    <div class="song-header">
+      <div class="song-header-title">${escHtml(dateStr)}</div>
+      <div class="song-header-artist">Explore this date in history</div>
+    </div>`;
+}
+
+function resetPanelsForDate() {
+  el('panel-song-wrap').hidden   = true;
+  el('panel-artist-wrap').hidden = true;
+  ['panel-history-body', 'panel-concurrent-body', 'panel-tv-body', 'panel-movies-body'].forEach(id => {
+    setHTML(id, '<div class="loading">Loading…</div>');
+  });
+}
+
+async function selectDate(year, month, day) {
+  hide('picker-section');
+  show('results-section');
+  resetPanelsForDate();
+  renderDateHeader(year, month, day);
+  el('results-section').scrollIntoView({ behavior: 'smooth' });
+
+  getOnThisDay(month, day)
+    .then(d => renderHistoryPanel(d, year));
+  getConcurrentReleases(year, month, day)
+    .then(d => renderConcurrentPanel(d, '', ''));
+  getTVPremieres(year, month, day)
+    .then(d => renderTVPanel(d));
+  getMovieReleases(year, month, day)
+    .then(d => renderMoviePanel(d));
+}
+
 function resetPanels() {
+  el('panel-song-wrap').hidden   = false;
+  el('panel-artist-wrap').hidden = false;
   ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body', 'panel-tv-body', 'panel-movies-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
@@ -550,3 +595,25 @@ el('search-form').addEventListener('submit', async e => {
 
 el('back-btn').addEventListener('click', goToSearch);
 el('new-search-btn').addEventListener('click', goToSearch);
+
+el('tab-song').addEventListener('click', () => {
+  el('search-form').hidden = false;
+  el('date-form').hidden   = true;
+  el('tab-song').classList.add('active');
+  el('tab-date').classList.remove('active');
+});
+
+el('tab-date').addEventListener('click', () => {
+  el('search-form').hidden = true;
+  el('date-form').hidden   = false;
+  el('tab-date').classList.add('active');
+  el('tab-song').classList.remove('active');
+});
+
+el('date-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const val = el('date-input').value; // "YYYY-MM-DD"
+  if (!val) return;
+  const [year, month, day] = val.split('-').map(Number);
+  selectDate(year, month, day);
+});
