@@ -1,39 +1,6 @@
 /* ============================================================
-   WHEN IT DROPPED — Spotify-Inspired Styles
+   WHEN IT DROPPED — Apple Music-Inspired Styles
    ============================================================ */
-
-/* ── Music Page Theme Override ───────────────────────────── */
-.music-page {
-  background: #121212;
-  color: #ffffff;
-  --bg:         #121212;
-  --bg-surface: #181818;
-  --gold:       #1DB954;
-  --green:      #1DB954;
-  --orange:     #1DB954;
-  --red:        #E91429;
-  --cream:      #ffffff;
-  --text-muted: #A7A7A7;
-}
-
-.music-page nav {
-  background: rgba(18, 18, 18, 0.96);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  border-image: none;
-}
-
-.music-page nav .nav-logo {
-  color: #1DB954;
-}
-
-.music-page nav .nav-links a {
-  color: #A7A7A7;
-}
-
-.music-page nav .nav-links a:hover {
-  color: #ffffff;
-  opacity: 1;
-}
 
 /* ── Search Section ──────────────────────────────────────── */
 #search-section {
@@ -44,7 +11,7 @@
   text-align: center;
   padding: 2rem;
   padding-top: var(--nav-height);
-  background: #121212;
+  background: var(--bg);
   position: relative;
   overflow: hidden;
 }
@@ -55,9 +22,9 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, rgba(29, 185, 84, 0.1) 0%, transparent 65%);
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, rgba(252, 60, 68, 0.08) 0%, transparent 65%);
   pointer-events: none;
 }
 
@@ -72,27 +39,28 @@
   font-family: var(--font-sans);
   font-size: 0.7rem;
   font-weight: 600;
-  color: #1DB954;
+  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.35em;
   margin-bottom: 1rem;
 }
 
 .app-title {
-  font-family: var(--font-display);
-  font-size: clamp(4rem, 15vw, 9rem);
-  color: #ffffff;
-  text-transform: uppercase;
-  line-height: 0.88;
+  font-family: var(--font-sans);
+  font-size: clamp(3.5rem, 13vw, 8rem);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
   margin-bottom: 1.5rem;
 }
 
 .app-desc {
   font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 300;
-  color: #A7A7A7;
+  font-size: 1.0625rem;
+  color: var(--text-muted);
   margin-bottom: 2.5rem;
+  line-height: 1.6;
 }
 
 .search-form { width: 100%; }
@@ -108,54 +76,31 @@
   flex: 1;
   min-width: 200px;
   padding: 0.85rem 1.25rem;
-  background: #282828;
-  border: 1px solid transparent;
-  color: #ffffff;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  color: var(--text);
   font-family: var(--font-sans);
   font-size: 0.9375rem;
   font-weight: 400;
   outline: none;
-  border-radius: 4px;
+  border-radius: 12px;
   transition: background 0.15s, border-color 0.15s;
 }
 
-.search-fields input::placeholder { color: #535353; }
+.search-fields input::placeholder { color: var(--text-muted); }
 
 .search-fields input:focus {
-  background: #2A2A2A;
-  border-color: #ffffff;
+  background: var(--bg);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(252, 60, 68, 0.1);
 }
 
-/* ── Buttons ─────────────────────────────────────────────── */
-.music-page .btn.btn-primary {
-  background: #1DB954;
-  color: #000000;
-  font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 0.875rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 0.875rem 2rem;
-  border: none;
-  border-radius: 500px;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
-}
-
-.music-page .btn.btn-primary:hover {
-  background: #1ed760;
-  color: #000000;
-  transform: scale(1.02);
-  opacity: 1;
-}
-
+/* ── Ghost Button ────────────────────────────────────────── */
 .btn-ghost {
   font-family: var(--font-sans);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 500;
-  color: #A7A7A7;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  color: var(--text-muted);
   background: none;
   border: none;
   cursor: pointer;
@@ -163,9 +108,10 @@
   white-space: nowrap;
   transition: color 0.15s;
   margin-top: 0.5rem;
+  letter-spacing: -0.01em;
 }
 
-.btn-ghost:hover { color: #ffffff; }
+.btn-ghost:hover { color: var(--text); }
 
 /* ── Section Header Row ──────────────────────────────────── */
 .section-header-row {
@@ -179,8 +125,8 @@
 /* ── Picker Section ──────────────────────────────────────── */
 #picker-section {
   padding: 80px 0;
-  background: #121212;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
 }
 
 .picker-item {
@@ -188,26 +134,30 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.25rem;
-  background: #181818;
+  background: var(--bg-surface);
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   margin-bottom: 0.5rem;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.15s;
   gap: 1rem;
 }
 
-.picker-item:hover { background: #282828; }
+.picker-item:hover {
+  background: #eaeaec;
+  transform: translateX(4px);
+}
+
 .picker-item:last-child { margin-bottom: 0; }
 
 .picker-left { min-width: 0; }
 
 .picker-song {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-size: 1rem;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -216,7 +166,7 @@
 .picker-artist {
   font-family: var(--font-sans);
   font-size: 0.8125rem;
-  color: #A7A7A7;
+  color: var(--text-muted);
   font-weight: 400;
   margin-top: 0.15rem;
 }
@@ -229,13 +179,13 @@
 .picker-date {
   font-family: var(--font-sans);
   font-size: 0.75rem;
-  color: #1DB954;
-  font-weight: 500;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .picker-album {
   font-size: 0.7rem;
-  color: #535353;
+  color: var(--text-muted);
   margin-top: 0.1rem;
   font-style: italic;
 }
@@ -243,19 +193,20 @@
 /* ── Results Section ─────────────────────────────────────── */
 #results-section {
   padding: 80px 0 120px;
-  background: #121212;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
 }
 
 /* Song Header */
 .song-header { padding-bottom: 0; }
 
 .song-header-title {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-size: clamp(2rem, 7vw, 4.5rem);
-  color: #ffffff;
-  text-transform: uppercase;
-  line-height: 0.92;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
   margin-bottom: 0.4rem;
 }
 
@@ -263,9 +214,8 @@
   font-family: var(--font-sans);
   font-size: 1rem;
   font-weight: 500;
-  color: #A7A7A7;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  letter-spacing: -0.01em;
   margin-bottom: 0.25rem;
 }
 
@@ -273,9 +223,9 @@
   font-family: var(--font-sans);
   font-size: 0.75rem;
   font-weight: 600;
-  color: #1DB954;
+  color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.1em;
 }
 
 /* ── Results Grid ────────────────────────────────────────── */
@@ -288,11 +238,17 @@
 
 /* ── Panels ──────────────────────────────────────────────── */
 .panel {
-  background: #181818;
-  border-radius: 8px;
+  background: var(--bg-surface);
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
 }
 
 .panel-gold,
@@ -302,41 +258,31 @@
 .panel-blue,
 .panel-purple {
   border: none;
-  border-top: 3px solid #1DB954;
 }
 
 .panel-title {
-  font-family: var(--font-display);
-  font-size: 0.7rem;
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: #1DB954;
+  letter-spacing: 0.12em;
+  color: var(--accent);
   padding: 1rem 1.25rem 0.75rem;
   background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.panel-gold   .panel-title,
-.panel-red    .panel-title,
-.panel-green  .panel-title,
-.panel-orange .panel-title,
-.panel-blue   .panel-title,
-.panel-purple .panel-title {
-  color: #1DB954;
+  border-bottom: 1px solid var(--border);
 }
 
 .panel-body {
   padding: 1.25rem;
-  font-size: 0.875rem;
-  font-weight: 300;
-  color: #A7A7A7;
-  line-height: 1.75;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.7;
   flex: 1;
 }
 
 /* ── Loading State ───────────────────────────────────────── */
 .loading {
-  color: #535353;
+  color: var(--text-muted);
   font-family: var(--font-sans);
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -355,52 +301,45 @@
 .detail-label {
   font-family: var(--font-sans);
   font-size: 0.6rem;
-  font-weight: 600;
-  color: #1DB954;
+  font-weight: 700;
+  color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  margin-bottom: 0.15rem;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.2rem;
 }
 
 .detail-value {
   font-family: var(--font-sans);
   font-size: 0.9375rem;
-  font-weight: 400;
-  color: #ffffff;
+  font-weight: 500;
+  color: var(--text);
 }
 
 .wiki-extract {
   font-size: 0.875rem;
   line-height: 1.75;
-  color: #A7A7A7;
+  color: var(--text-muted);
   margin-top: 1.25rem;
   padding-top: 1.25rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border);
 }
 
 .wiki-link {
   display: inline-block;
   margin-top: 0.75rem;
   font-family: var(--font-sans);
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #1DB954;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  border-bottom: 1px solid rgba(29, 185, 84, 0.4);
-  transition: color 0.15s, border-color 0.15s;
+  color: var(--accent);
+  transition: opacity 0.15s;
 }
 
-.wiki-link:hover {
-  color: #1ed760;
-  border-color: #1ed760;
-  opacity: 1;
-}
+.wiki-link:hover { opacity: 0.7; }
 
 /* ── History Panel ───────────────────────────────────────── */
 .history-event {
   padding: 0.8rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
 }
 
 .history-event:first-child { padding-top: 0; }
@@ -408,94 +347,94 @@
 
 .history-year {
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.05em;
-  color: #1DB954;
+  color: var(--accent);
   margin-bottom: 0.2rem;
   text-transform: uppercase;
 }
 
 .history-text {
   font-size: 0.875rem;
-  color: #A7A7A7;
+  color: var(--text-muted);
   line-height: 1.55;
 }
 
 /* ── Concurrent Releases Panel ───────────────────────────── */
 .concurrent-item {
   padding: 0.8rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
 }
 
 .concurrent-item:first-child { padding-top: 0; }
 .concurrent-item:last-child  { border-bottom: none; }
 
 .concurrent-title {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-size: 0.9375rem;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
   margin-bottom: 0.1rem;
 }
 
 .concurrent-artist {
   font-size: 0.8rem;
-  color: #1DB954;
-  font-weight: 400;
+  color: var(--accent);
+  font-weight: 500;
 }
 
 .concurrent-date {
   font-size: 0.7rem;
-  color: #535353;
+  color: var(--text-muted);
   margin-top: 0.1rem;
 }
 
 /* ── Artist Panel ────────────────────────────────────────── */
 .artist-name {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-size: 1.5rem;
-  color: #ffffff;
-  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.03em;
   line-height: 1;
   margin-bottom: 0.3rem;
 }
 
 .artist-origin {
   font-size: 0.8rem;
-  color: #A7A7A7;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
   margin-bottom: 0.75rem;
 }
 
 /* ── TV Premieres Panel ──────────────────────────────────── */
 .tv-item {
   padding: 0.8rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
 }
 
 .tv-item:first-child { padding-top: 0; }
 .tv-item:last-child  { border-bottom: none; }
 
 .tv-title {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-size: 0.9375rem;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
   margin-bottom: 0.1rem;
 }
 
 .tv-network {
   font-size: 0.8rem;
-  color: #1DB954;
-  font-weight: 400;
+  color: var(--accent);
+  font-weight: 500;
 }
 
 .tv-genre {
   font-size: 0.7rem;
-  color: #535353;
+  color: var(--text-muted);
   margin-top: 0.1rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -504,36 +443,36 @@
 /* ── Movies Panel ────────────────────────────────────────── */
 .movie-item {
   padding: 0.8rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
 }
 
 .movie-item:first-child { padding-top: 0; }
 .movie-item:last-child  { border-bottom: none; }
 
 .movie-title {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-size: 0.9375rem;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
   margin-bottom: 0.1rem;
 }
 
 .movie-director {
   font-size: 0.8rem;
-  color: #A7A7A7;
+  color: var(--text-muted);
   font-style: italic;
 }
 
 /* ── Utility ─────────────────────────────────────────────── */
 .no-data {
-  color: #535353;
+  color: var(--text-muted);
   font-style: italic;
   font-size: 0.875rem;
 }
 
 .error-msg {
-  color: #E91429;
+  color: var(--accent);
   font-size: 0.875rem;
 }
 
