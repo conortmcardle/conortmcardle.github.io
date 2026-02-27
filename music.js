@@ -227,18 +227,16 @@ function renderSongPanel(rec, release, wikiData) {
 }
 
 function renderHistoryPanel(data, releaseYear) {
-  const events = (data?.events ?? []).filter(e => e.year === releaseYear);
+  const events = (data?.events ?? []).slice(0, 5);
 
   if (!events.length) {
-    const msg = releaseYear
-      ? `No recorded events found for ${releaseYear} on this date.`
-      : 'No historical events found for this date.';
-    setHTML('panel-history-body', `<p class="no-data">${msg}</p>`);
+    setHTML('panel-history-body', '<p class="no-data">No historical events found for this date.</p>');
     return;
   }
 
   const html = events.map(event => `
     <div class="history-event">
+      <div class="history-year">${escHtml(String(event.year))}</div>
       <div class="history-text">${escHtml(event.text)}</div>
     </div>`).join('');
 
