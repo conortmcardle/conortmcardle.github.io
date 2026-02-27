@@ -164,7 +164,7 @@ async function getMovieReleases(year, month, day) {
 
 async function getOnThisDay(month, day) {
   const pad = n => String(n).padStart(2, '0');
-  return wikiFetch(`/feed/onthisday/events/${pad(month)}/${pad(day)}`);
+  return wikiFetch(`/feed/onthisday/all/${pad(month)}/${pad(day)}`);
 }
 
 async function getWikiSummary(title) {
@@ -283,17 +283,23 @@ function renderSongPanel(rec, release, wikiData) {
 }
 
 function renderHistoryPanel(data, releaseYear) {
-  const allEvents = data?.events ?? [];
-  if (!allEvents.length) {
+  if (!data || !releaseYear) {
     setHTML('panel-history-body', '<p class="no-data">No historical events found for this date.</p>');
     return;
   }
 
-  // Prioritise events from the release year, then fill up to 4 with events
-  // from other years on the same calendar date.
-  const fromYear = releaseYear ? allEvents.filter(e => e.year === releaseYear) : [];
-  const others   = releaseYear ? allEvents.filter(e => e.year !== releaseYear) : allEvents;
-  const events   = [...fromYear, ...others].slice(0, 4);
+  // Combine events, births and deaths all from the exact release year.
+  const byYear = arr => (arr ?? []).filter(e => e.year === releaseYear);
+  const events = [
+    ...byYear(data.events),
+    ...byYear(data.births).map(e => ({ ...e, text: `Born: ${e.text}` })),
+    ...byYear(data.deaths).map(e => ({ ...e, text: `Died: ${e.text}` })),
+  ].slice(0, 4);
+
+  if (!events.length) {
+    setHTML('panel-history-body', '<p class="no-data">No historical events found for this date.</p>');
+    return;
+  }
 
   const html = events.map(event => `
     <div class="history-event">
