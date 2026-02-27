@@ -134,6 +134,13 @@ async function searchRecordings(title, artist) {
   return mbFetch(path);
 }
 
+async function searchReleaseGroups(title, artist) {
+  let q = `releasegroup:"${title.replace(/"/g, '')}"`;
+  if (artist) q += ` AND artist:"${artist.replace(/"/g, '')}"`;
+  const path = `/release-group?query=${encodeURIComponent(q)}&fmt=json&limit=20&inc=artist-credits`;
+  return mbFetch(path);
+}
+
 async function getArtistDetails(artistId) {
   return mbFetch(`/artist/${artistId}?fmt=json`);
 }
@@ -236,6 +243,19 @@ async function getWikiSummary(title) {
   return wikiFetch(`/page/summary/${slug}`);
 }
 
+async function getAlbumWiki(title, artistName) {
+  const variants = [
+    `${title} (${artistName} album)`,
+    `${title} (album)`,
+    title,
+  ];
+  for (const v of variants) {
+    const data = await getWikiSummary(v);
+    if (data && data.type !== 'disambiguation' && data.extract) return data;
+  }
+  return null;
+}
+
 async function getSongWiki(title, artistName) {
   // Try specific variants first so "Yellow (Coldplay song)" wins over the
   // color article, and "Pink (Aerosmith song)" wins over the color article.
@@ -306,6 +326,42 @@ function renderPicker(recordings) {
   });
 }
 
+function renderAlbumPicker(groups) {
+  if (!groups?.length) {
+    setHTML('picker-list', '<p class="no-data">No albums found — try adjusting your search.</p>');
+    return;
+  }
+
+  const sorted = [...groups]
+    .sort((a, b) => (a['first-release-date'] ?? '9999').localeCompare(b['first-release-date'] ?? '9999'))
+    .slice(0, 8);
+
+  const items = sorted.map((rg, i) => {
+    const artist = rg['artist-credit']?.[0]?.artist?.name ?? 'Unknown Artist';
+    const year   = rg['first-release-date']?.split('-')[0] ?? '';
+    const type   = rg['primary-type'] ?? '';
+    return `
+      <div class="picker-item" data-index="${i}">
+        <div class="picker-left">
+          <div class="picker-song">${escHtml(rg.title)}</div>
+          <div class="picker-artist">${escHtml(artist)}</div>
+        </div>
+        <div class="picker-right">
+          ${year ? `<div class="picker-date">${escHtml(year)}</div>` : ''}
+          ${type ? `<div class="picker-album">${escHtml(type)}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  setHTML('picker-list', items);
+
+  document.querySelectorAll('.picker-item').forEach(item => {
+    item.addEventListener('click', () => {
+      selectReleaseGroup(sorted[parseInt(item.dataset.index, 10)]);
+    });
+  });
+}
+
 function renderSongHeader(title, artistName, release) {
   const dateStr = release?.date ? formatDate(release.date) : 'Date unknown';
   el('song-header').innerHTML = `
@@ -355,6 +411,31 @@ function renderSongPanel(rec, release, wikiData) {
   }
 
   setHTML('panel-song-body', html || '<p class="no-data">No details available.</p>');
+}
+
+function renderAlbumPanel(rg, wikiData) {
+  let html = '';
+
+  if (rg.id) {
+    const mbRgUrl = `https://musicbrainz.org/release-group/${escHtml(rg.id)}`;
+    html += `<a href="${mbRgUrl}" target="_blank" rel="noopener"><img class="cover-img"
+      src="https://coverartarchive.org/release-group/${escHtml(rg.id)}/front-250"
+      alt="Album cover"
+      onerror="this.style.display='none'"></a>`;
+  }
+
+  if (rg['first-release-date']) html += detail('Release Date', formatDate(rg['first-release-date']));
+  if (rg['primary-type'])       html += detail('Type', rg['primary-type']);
+
+  if (wikiData?.extract) {
+    const excerpt = wikiData.extract.split('. ').slice(0, 4).join('. ') + '.';
+    html += `<div class="wiki-extract">${escHtml(excerpt)}</div>`;
+    if (wikiData.content_urls?.desktop?.page) {
+      html += `<a class="wiki-link" href="${escHtml(wikiData.content_urls.desktop.page)}" target="_blank" rel="noopener">Read on Wikipedia →</a>`;
+    }
+  }
+
+  setHTML('panel-song-body', html || '<p class="no-data">No album details available.</p>');
 }
 
 function renderHistoryPanel(data, releaseYear) {
@@ -609,6 +690,7 @@ async function selectRecording(rec) {
   hide('picker-section');
   show('results-section');
   resetPanels();
+  el('panel-song-title').textContent = 'THE SONG';
   el('results-section').scrollIntoView({ behavior: 'smooth' });
 
   // Full recording lookup: gets ALL releases with release-group secondary-types
@@ -659,6 +741,61 @@ async function selectRecording(rec) {
   });
 }
 
+async function selectReleaseGroup(rg) {
+  const credit     = rg['artist-credit']?.[0];
+  const artistName = credit?.artist?.name ?? 'Unknown';
+  const artistId   = credit?.artist?.id ?? null;
+  const date       = parseDate(rg['first-release-date']);
+
+  hide('picker-section');
+  show('results-section');
+  resetPanels();
+  el('panel-song-title').textContent = 'THE ALBUM';
+  el('results-section').scrollIntoView({ behavior: 'smooth' });
+
+  el('song-header').innerHTML = `
+    <div class="song-header">
+      <div class="song-header-title">${escHtml(rg.title)}</div>
+      <div class="song-header-artist">${escHtml(artistName)}</div>
+      ${date?.raw ? `<div class="song-header-date">Released ${escHtml(formatDate(date.raw))}</div>` : ''}
+    </div>`;
+
+  const hasFullDate = date?.year && date?.month && date?.day;
+
+  getAlbumWiki(rg.title, artistName)
+    .then(d => { renderAlbumPanel(rg, d); tickProgress(); });
+
+  if (date?.year && date?.month && date?.day) {
+    getThisWeekInHistory(date.year, date.month, date.day)
+      .then(d => { renderHistoryPanel(d, date.year); tickProgress(); });
+  } else {
+    renderHistoryPanel(null, 0);
+    tickProgress();
+  }
+
+  if (hasFullDate) {
+    getConcurrentReleases(date.year, date.month, date.day)
+      .then(d => { renderConcurrentPanel(d, rg.title, artistName); tickProgress(); });
+    getTVPremieres(date.year, date.month, date.day)
+      .then(d => { renderTVPanel(d);                                tickProgress(); });
+    getMovieReleases(date.year, date.month, date.day)
+      .then(d => { renderMoviePanel(d);                             tickProgress(); });
+  } else {
+    renderConcurrentPanel(null, rg.title, artistName);
+    renderTVPanel(null);
+    renderMoviePanel(null);
+    tickProgress(); tickProgress(); tickProgress();
+  }
+
+  Promise.all([
+    artistId ? getArtistDetails(artistId) : Promise.resolve(null),
+    getWikiSummary(artistName),
+  ]).then(([artistMb, artistWiki]) => {
+    renderArtistPanel(artistMb, artistWiki?.type === 'disambiguation' ? null : artistWiki);
+    tickProgress();
+  });
+}
+
 function goToSearch() {
   hide('picker-section');
   hide('results-section');
@@ -677,6 +814,7 @@ el('search-form').addEventListener('submit', async e => {
 
   hide('results-section');
   show('picker-section');
+  el('picker-title').textContent = 'SELECT A SONG';
   setHTML('picker-list', '<div class="loading">Searching…</div>');
   el('picker-section').scrollIntoView({ behavior: 'smooth' });
 
@@ -684,22 +822,38 @@ el('search-form').addEventListener('submit', async e => {
   renderPicker(data?.recordings ?? []);
 });
 
+el('album-form').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const title  = el('album-input').value.trim();
+  const artist = el('album-artist-input').value.trim();
+  if (!title) return;
+
+  hide('results-section');
+  show('picker-section');
+  el('picker-title').textContent = 'SELECT AN ALBUM';
+  setHTML('picker-list', '<div class="loading">Searching…</div>');
+  el('picker-section').scrollIntoView({ behavior: 'smooth' });
+
+  const data = await searchReleaseGroups(title, artist);
+  renderAlbumPicker(data?.['release-groups'] ?? []);
+});
+
 el('back-btn').addEventListener('click', goToSearch);
 el('new-search-btn').addEventListener('click', goToSearch);
 
-el('tab-song').addEventListener('click', () => {
-  el('search-form').hidden = false;
-  el('date-form').hidden   = true;
-  el('tab-song').classList.add('active');
-  el('tab-date').classList.remove('active');
-});
+function switchTab(active) {
+  ['song', 'album', 'date'].forEach(t => {
+    el(`tab-${t}`).classList.toggle('active', t === active);
+  });
+  el('search-form').hidden = active !== 'song';
+  el('album-form').hidden  = active !== 'album';
+  el('date-form').hidden   = active !== 'date';
+}
 
-el('tab-date').addEventListener('click', () => {
-  el('search-form').hidden = true;
-  el('date-form').hidden   = false;
-  el('tab-date').classList.add('active');
-  el('tab-song').classList.remove('active');
-});
+el('tab-song').addEventListener('click',  () => switchTab('song'));
+el('tab-album').addEventListener('click', () => switchTab('album'));
+el('tab-date').addEventListener('click',  () => switchTab('date'));
 
 el('date-form').addEventListener('submit', e => {
   e.preventDefault();
