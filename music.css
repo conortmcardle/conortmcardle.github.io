@@ -491,7 +491,8 @@
   margin-bottom: 0.1rem;
 }
 
-.movie-director {
+.movie-director,
+.movie-writer {
   font-size: 0.8rem;
   color: var(--text-muted);
   font-style: italic;

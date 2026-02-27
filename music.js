@@ -180,11 +180,31 @@ async function getMovieReleases(year, month, day) {
   });
   if (!data?.results?.length) return [];
 
-  return data.results.slice(0, 8).map(m => ({
+  const top = data.results.slice(0, 8);
+
+  // Fetch credits for all movies in parallel — one extra call per film but
+  // they resolve concurrently so the wall-clock cost is just one round-trip.
+  await Promise.all(top.map(async m => {
+    const credits = await safeFetch(
+      `https://api.themoviedb.org/3/movie/${m.id}/credits?language=en-US`,
+      { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } }
+    );
+    if (!credits?.crew) return;
+    const seen = new Set();
+    const uniq = name => { if (seen.has(name)) return false; seen.add(name); return true; };
+    m._directors = credits.crew.filter(c => c.job === 'Director').map(c => c.name).filter(uniq);
+    m._writers   = credits.crew
+      .filter(c => ['Screenplay', 'Writer', 'Story'].includes(c.job))
+      .map(c => c.name).filter(uniq).slice(0, 2);
+  }));
+
+  return top.map(m => ({
     title:     m.title,
     date:      m.release_date ?? '',
     posterUrl: m.poster_path ? `https://image.tmdb.org/t/p/w200${m.poster_path}` : null,
     tmdbUrl:   `https://www.themoviedb.org/movie/${m.id}`,
+    directors: m._directors ?? [],
+    writers:   m._writers   ?? [],
   }));
 }
 
@@ -217,11 +237,13 @@ async function getWikiSummary(title) {
 }
 
 async function getSongWiki(title, artistName) {
-  // Try a few title variants to find the right Wikipedia article
+  // Try specific variants first so "Yellow (Coldplay song)" wins over the
+  // color article, and "Pink (Aerosmith song)" wins over the color article.
+  // Bare title is last resort — it's often the wrong thing entirely.
   const variants = [
-    title,
-    `${title} (song)`,
     `${title} (${artistName} song)`,
+    `${title} (song)`,
+    title,
   ];
   for (const v of variants) {
     const data = await getWikiSummary(v);
@@ -483,11 +505,16 @@ function renderMoviePanel(data) {
       ? `<a href="${escHtml(m.tmdbUrl)}" target="_blank" rel="noopener">${imgHtml}</a>`
       : '';
 
+    const directors = m.directors?.length ? `<div class="movie-director">dir. ${escHtml(m.directors.join(', '))}</div>` : '';
+    const writers   = m.writers?.length   ? `<div class="movie-writer">writ. ${escHtml(m.writers.join(', '))}</div>`   : '';
+
     return `
       <div class="movie-item">
         ${wrappedImg}
         <div class="movie-info">
           <div class="movie-title">${titleHtml}</div>
+          ${directors}
+          ${writers}
           ${dateStr ? `<div class="movie-date">${escHtml(dateStr)}</div>` : ''}
         </div>
       </div>`;
