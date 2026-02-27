@@ -298,7 +298,9 @@
 .panel-gold,
 .panel-red,
 .panel-green,
-.panel-orange {
+.panel-orange,
+.panel-blue,
+.panel-purple {
   border: none;
   border-top: 3px solid #1DB954;
 }
@@ -314,10 +316,12 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.panel-gold  .panel-title,
-.panel-red   .panel-title,
-.panel-green .panel-title,
-.panel-orange .panel-title {
+.panel-gold   .panel-title,
+.panel-red    .panel-title,
+.panel-green  .panel-title,
+.panel-orange .panel-title,
+.panel-blue   .panel-title,
+.panel-purple .panel-title {
   color: #1DB954;
 }
 
@@ -463,6 +467,62 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 0.75rem;
+}
+
+/* ── TV Premieres Panel ──────────────────────────────────── */
+.tv-item {
+  padding: 0.8rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tv-item:first-child { padding-top: 0; }
+.tv-item:last-child  { border-bottom: none; }
+
+.tv-title {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.1rem;
+}
+
+.tv-network {
+  font-size: 0.8rem;
+  color: #1DB954;
+  font-weight: 400;
+}
+
+.tv-genre {
+  font-size: 0.7rem;
+  color: #535353;
+  margin-top: 0.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Movies Panel ────────────────────────────────────────── */
+.movie-item {
+  padding: 0.8rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.movie-item:first-child { padding-top: 0; }
+.movie-item:last-child  { border-bottom: none; }
+
+.movie-title {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.1rem;
+}
+
+.movie-director {
+  font-size: 0.8rem;
+  color: #A7A7A7;
+  font-style: italic;
 }
 
 /* ── Utility ─────────────────────────────────────────────── */
