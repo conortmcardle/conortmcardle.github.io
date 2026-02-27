@@ -114,6 +114,30 @@ async function getConcurrentReleases(year, month, day) {
   return mbFetch(path);
 }
 
+async function getTVPremieres(year, month, day) {
+  const pad = n => String(n).padStart(2, '0');
+  const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+  return safeFetch(`https://api.tvmaze.com/schedule?date=${dateStr}&country=US`);
+}
+
+async function getMovieReleases(year, month, day) {
+  const pad = n => String(n).padStart(2, '0');
+  const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+  const query = `
+    SELECT DISTINCT ?film ?filmLabel ?directorLabel WHERE {
+      ?film wdt:P31 wd:Q11424.
+      ?film wdt:P577 ?date.
+      FILTER(STRSTARTS(STR(?date), "${dateStr}"))
+      OPTIONAL { ?film wdt:P57 ?director. }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+    }
+    LIMIT 10
+  `;
+  return safeFetch(
+    `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(query)}`
+  );
+}
+
 // ── Wikipedia API ─────────────────────────────────────────────────────────────
 
 async function getOnThisDay(month, day) {
@@ -285,6 +309,74 @@ function renderConcurrentPanel(data, currentTitle, artistName) {
   setHTML('panel-concurrent-body', html);
 }
 
+function renderTVPanel(data) {
+  if (!Array.isArray(data) || !data.length) {
+    setHTML('panel-tv-body', '<p class="no-data">No TV premieres found for this date.</p>');
+    return;
+  }
+
+  const seen = new Set();
+  const premieres = data.filter(ep => {
+    if (ep.season !== 1 || ep.number !== 1) return false;
+    const key = ep.show?.name;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 8);
+
+  if (!premieres.length) {
+    setHTML('panel-tv-body', '<p class="no-data">No TV premieres found for this date.</p>');
+    return;
+  }
+
+  const html = premieres.map(ep => {
+    const show    = ep.show ?? {};
+    const network = show.network?.name ?? show.webChannel?.name ?? '';
+    const genres  = show.genres?.slice(0, 2).join(', ') ?? '';
+    return `
+      <div class="tv-item">
+        <div class="tv-title">${escHtml(show.name ?? ep.name)}</div>
+        ${network ? `<div class="tv-network">${escHtml(network)}</div>` : ''}
+        ${genres  ? `<div class="tv-genre">${escHtml(genres)}</div>`   : ''}
+      </div>`;
+  }).join('');
+
+  setHTML('panel-tv-body', html);
+}
+
+function renderMoviePanel(data) {
+  const bindings = data?.results?.bindings ?? [];
+  if (!bindings.length) {
+    setHTML('panel-movies-body', '<p class="no-data">No movies found for this date.</p>');
+    return;
+  }
+
+  const seen = new Set();
+  const movies = bindings.filter(b => {
+    const title = b.filmLabel?.value;
+    if (!title || /^Q\d+$/.test(title) || seen.has(title)) return false;
+    seen.add(title);
+    return true;
+  }).slice(0, 8);
+
+  if (!movies.length) {
+    setHTML('panel-movies-body', '<p class="no-data">No movies found for this date.</p>');
+    return;
+  }
+
+  const html = movies.map(b => {
+    const title    = b.filmLabel?.value    ?? '';
+    const director = b.directorLabel?.value ?? '';
+    return `
+      <div class="movie-item">
+        <div class="movie-title">${escHtml(title)}</div>
+        ${director ? `<div class="movie-director">dir. ${escHtml(director)}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  setHTML('panel-movies-body', html);
+}
+
 function renderArtistPanel(mbData, wikiData) {
   let html = '';
 
@@ -310,7 +402,7 @@ function renderArtistPanel(mbData, wikiData) {
 // ── Core Flow ─────────────────────────────────────────────────────────────────
 
 function resetPanels() {
-  ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body'].forEach(id => {
+  ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body', 'panel-tv-body', 'panel-movies-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
 }
@@ -331,17 +423,22 @@ async function selectRecording(rec) {
   el('results-section').scrollIntoView({ behavior: 'smooth' });
 
   // Fire all requests in parallel
-  const [songWiki, historyData, concurrentData, artistMb, artistWiki] = await Promise.all([
+  const hasFullDate = date?.year && date?.month && date?.day;
+  const [songWiki, historyData, concurrentData, artistMb, artistWiki, tvData, movieData] = await Promise.all([
     getSongWiki(title, artistName),
     date?.month && date?.day ? getOnThisDay(date.month, date.day) : Promise.resolve(null),
-    date?.year && date?.month && date?.day ? getConcurrentReleases(date.year, date.month, date.day) : Promise.resolve(null),
+    hasFullDate ? getConcurrentReleases(date.year, date.month, date.day) : Promise.resolve(null),
     artistId ? getArtistDetails(artistId) : Promise.resolve(null),
     getWikiSummary(artistName),
+    hasFullDate ? getTVPremieres(date.year, date.month, date.day)  : Promise.resolve(null),
+    hasFullDate ? getMovieReleases(date.year, date.month, date.day) : Promise.resolve(null),
   ]);
 
   renderSongPanel(rec, release, songWiki);
   renderHistoryPanel(historyData, date?.year ?? 0);
   renderConcurrentPanel(concurrentData, title, artistName);
+  renderTVPanel(tvData);
+  renderMoviePanel(movieData);
   renderArtistPanel(
     artistMb,
     artistWiki?.type === 'disambiguation' ? null : artistWiki
