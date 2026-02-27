@@ -855,10 +855,58 @@ el('tab-song').addEventListener('click',  () => switchTab('song'));
 el('tab-album').addEventListener('click', () => switchTab('album'));
 el('tab-date').addEventListener('click',  () => switchTab('date'));
 
+function parseTextDate(str) {
+  str = str.trim();
+  const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  let m = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (m) return { year: +m[1], month: +m[2], day: +m[3] };
+
+  // DD/MM/YYYY  DD-MM-YYYY  DD.MM.YYYY
+  m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (m) return { year: +m[3], month: +m[2], day: +m[1] };
+
+  // "14 June 1955"
+  m = str.match(/^(\d{1,2})\s+([A-Za-z]+)[,\s]+(\d{4})$/);
+  if (m) {
+    const idx = MONTHS.findIndex(mn => m[2].toLowerCase().startsWith(mn));
+    if (idx !== -1) return { year: +m[3], month: idx + 1, day: +m[1] };
+  }
+
+  // "June 14, 1955" or "June 14 1955"
+  m = str.match(/^([A-Za-z]+)\s+(\d{1,2})[,\s]+(\d{4})$/);
+  if (m) {
+    const idx = MONTHS.findIndex(mn => m[1].toLowerCase().startsWith(mn));
+    if (idx !== -1) return { year: +m[3], month: idx + 1, day: +m[2] };
+  }
+
+  // "June 1955" – no day, default to 1st
+  m = str.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (m) {
+    const idx = MONTHS.findIndex(mn => m[1].toLowerCase().startsWith(mn));
+    if (idx !== -1) return { year: +m[2], month: idx + 1, day: 1 };
+  }
+
+  // bare year "1955"
+  m = str.match(/^(\d{4})$/);
+  if (m) return { year: +m[1], month: 1, day: 1 };
+
+  return null;
+}
+
+el('date-input').addEventListener('input', () => el('date-input').setCustomValidity(''));
+
 el('date-form').addEventListener('submit', e => {
   e.preventDefault();
-  const val = el('date-input').value; // "YYYY-MM-DD"
+  const val = el('date-input').value.trim();
   if (!val) return;
-  const [year, month, day] = val.split('-').map(Number);
-  selectDate(year, month, day);
+  const parsed = parseTextDate(val);
+  if (!parsed) {
+    el('date-input').setCustomValidity('Try "14 June 1955", "6/14/1955", or just "1955"');
+    el('date-input').reportValidity();
+    return;
+  }
+  el('date-input').setCustomValidity('');
+  selectDate(parsed.year, parsed.month, parsed.day);
 });
