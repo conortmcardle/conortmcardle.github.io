@@ -68,11 +68,23 @@ function formatDate(dateStr) {
   }
 }
 
-function getEarliestRelease(releases) {
+function getBestRelease(releases) {
   if (!releases?.length) return null;
-  return releases
-    .filter(r => r.date)
-    .sort((a, b) => a.date.localeCompare(b.date))[0] ?? releases[0];
+  const dated = releases.filter(r => r.date);
+  if (!dated.length) return releases[0];
+
+  const sorted = [...dated].sort((a, b) => a.date.localeCompare(b.date));
+  const isFullDate = r => /^\d{4}-\d{2}-\d{2}$/.test(r.date);
+
+  // Prefer earliest US release with a full YYYY-MM-DD date
+  const usFullDate = sorted.find(r => r.country === 'US' && isFullDate(r));
+  if (usFullDate) return usFullDate;
+
+  // Any release with a full date
+  const anyFullDate = sorted.find(r => isFullDate(r));
+  if (anyFullDate) return anyFullDate;
+
+  return sorted[0];
 }
 
 // ── MusicBrainz API ───────────────────────────────────────────────────────────
@@ -135,7 +147,7 @@ function renderPicker(recordings) {
 
   const items = recordings.map((rec, i) => {
     const artist  = rec['artist-credit']?.[0]?.artist?.name ?? 'Unknown Artist';
-    const release = getEarliestRelease(rec.releases);
+    const release = getBestRelease(rec.releases);
     const date    = release?.date ? formatDate(release.date) : 'Date unknown';
     const album   = release?.title ?? '';
     return `
@@ -299,7 +311,7 @@ async function selectRecording(rec) {
   const credit     = rec['artist-credit']?.[0];
   const artistName = credit?.artist?.name ?? 'Unknown';
   const artistId   = credit?.artist?.id ?? null;
-  const release    = getEarliestRelease(rec.releases);
+  const release    = getBestRelease(rec.releases);
   const date       = parseDate(release?.date);
 
   hide('picker-section');
