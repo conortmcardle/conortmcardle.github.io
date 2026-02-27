@@ -230,7 +230,10 @@ function renderSongPanel(rec, release, wikiData) {
 }
 
 function renderHistoryPanel(data, releaseYear) {
-  const events = (data?.events ?? []).slice(0, 5);
+  const allEvents = data?.events ?? [];
+  const events = releaseYear
+    ? allEvents.filter(e => e.year === releaseYear)
+    : allEvents.slice(0, 5);
 
   if (!events.length) {
     setHTML('panel-history-body', '<p class="no-data">No historical events found for this date.</p>');
