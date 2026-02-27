@@ -148,10 +148,13 @@ function renderPicker(recordings) {
     return;
   }
 
-  // Sort: MusicBrainz relevance score first, then earliest canonical date as tiebreaker
+  // Sort: MusicBrainz relevance score first, then release count (popularity proxy),
+  // then earliest canonical date as final tiebreaker
   const sorted = [...recordings].sort((a, b) => {
     const scoreDiff = (b.score ?? 0) - (a.score ?? 0);
     if (scoreDiff !== 0) return scoreDiff;
+    const releaseCountDiff = (b.releases?.length ?? 0) - (a.releases?.length ?? 0);
+    if (releaseCountDiff !== 0) return releaseCountDiff;
     const da = getBestRelease(a.releases)?.date ?? '9999';
     const db = getBestRelease(b.releases)?.date ?? '9999';
     return da.localeCompare(db);
