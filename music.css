@@ -402,6 +402,15 @@
 .history-event:first-child { padding-top: 0; }
 .history-event:last-child  { border-bottom: none; }
 
+.history-year {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #1DB954;
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+}
+
 .history-text {
   font-size: 0.875rem;
   color: #A7A7A7;
