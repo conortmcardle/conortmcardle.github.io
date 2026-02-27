@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>When It Dropped — Song History</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="music.css" />
+</head>
+<body class="music-page">
+
+  <nav>
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">CM</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- SEARCH -->
+  <section id="search-section">
+    <div class="search-inner">
+      <p class="app-eyebrow">Song History App</p>
+      <h1 class="app-title">WHEN IT<br>DROPPED</h1>
+      <p class="app-desc">Search a song. See the world it was born into.</p>
+      <form id="search-form" class="search-form">
+        <div class="search-fields">
+          <input type="text" id="song-input" placeholder="Song title" autocomplete="off" required />
+          <input type="text" id="artist-input" placeholder="Artist (optional)" autocomplete="off" />
+          <button type="submit" class="btn btn-primary">GO</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- SONG PICKER -->
+  <section id="picker-section" hidden>
+    <div class="container">
+      <div class="section-header-row">
+        <h2 class="section-title">SELECT A SONG</h2>
+        <button class="btn-ghost" id="back-btn">← New Search</button>
+      </div>
+      <div id="picker-list"></div>
+    </div>
+  </section>
+
+  <!-- RESULTS DASHBOARD -->
+  <section id="results-section" hidden>
+    <div class="container">
+      <div class="section-header-row">
+        <div id="song-header"></div>
+        <button class="btn-ghost" id="new-search-btn">← New Search</button>
+      </div>
+
+      <div class="results-grid">
+
+        <div class="panel panel-gold">
+          <div class="panel-title">THE SONG</div>
+          <div class="panel-body" id="panel-song-body">
+            <div class="loading">Loading…</div>
+          </div>
+        </div>
+
+        <div class="panel panel-red">
+          <div class="panel-title">ON THIS DATE IN HISTORY</div>
+          <div class="panel-body" id="panel-history-body">
+            <div class="loading">Loading…</div>
+          </div>
+        </div>
+
+        <div class="panel panel-green">
+          <div class="panel-title">WHAT ELSE DROPPED</div>
+          <div class="panel-body" id="panel-concurrent-body">
+            <div class="loading">Loading…</div>
+          </div>
+        </div>
+
+        <div class="panel panel-orange">
+          <div class="panel-title">THE ARTIST</div>
+          <div class="panel-body" id="panel-artist-body">
+            <div class="loading">Loading…</div>
+          </div>
+        </div>
+
+        <div class="panel panel-blue">
+          <div class="panel-title">TV PREMIERES</div>
+          <div class="panel-body" id="panel-tv-body">
+            <div class="loading">Loading…</div>
+          </div>
+        </div>
+
+        <div class="panel panel-purple">
+          <div class="panel-title">IN CINEMAS</div>
+          <div class="panel-body" id="panel-movies-body">
+            <div class="loading">Loading…</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Designed &amp; Built by Conor McArdle &nbsp;·&nbsp; Data from <a href="https://musicbrainz.org" target="_blank" rel="noopener">MusicBrainz</a>, <a href="https://wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>, <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVMaze</a> &amp; <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a></p>
+  </footer>
+
+  <script src="music.js"></script>
+</body>
+</html>
