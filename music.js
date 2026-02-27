@@ -2,9 +2,10 @@
 
 // ── API Config ────────────────────────────────────────────────────────────────
 
-const MB_API   = 'https://musicbrainz.org/ws/2';
-const WIKI_API = 'https://en.wikipedia.org/api/rest_v1';
-const MB_HEADERS = { 'User-Agent': 'WhenItDropped/1.0 (https://conortmcardle.github.io)' };
+const MB_API      = 'https://musicbrainz.org/ws/2';
+const WIKI_API    = 'https://en.wikipedia.org/api/rest_v1';
+const TMDB_TOKEN  = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIwYzk3Y2ZmNGE2NDY5MWM5NTgxNjgzMzNmNWJjZGQyMyIsIm5iZiI6MTUxMzAxNzA4OC40NzksInN1YiI6IjVhMmVjZjAwOTI1MTQxMDMyYzE2OTAwOCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.TsyvP2XLtoS-QMCAVaLUF4MpONaDoK61-z4CXYjz2N0';
+const MB_HEADERS  = { 'User-Agent': 'WhenItDropped/1.0 (https://conortmcardle.github.io)' };
 
 // ── DOM Helpers ───────────────────────────────────────────────────────────────
 
@@ -167,56 +168,24 @@ async function getMovieReleases(year, month, day) {
   const start  = new Date(center); start.setUTCDate(start.getUTCDate() - 4);
   const end    = new Date(center); end.setUTCDate(end.getUTCDate() + 4);
   const fmtD   = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-  // Fetch Wikipedia article URL alongside film data — Wikipedia thumbnails are
-  // far more reliable movie posters than Wikidata P18 (which is a generic image
-  // that often ends up being a director/actor photo).
-  const query = `
-    SELECT DISTINCT ?film ?filmLabel ?directorLabel ?date ?article WHERE {
-      ?film wdt:P31 wd:Q11424.
-      ?film wdt:P577 ?date.
-      FILTER(?date >= "${fmtD(start)}T00:00:00Z"^^xsd:dateTime && ?date <= "${fmtD(end)}T23:59:59Z"^^xsd:dateTime)
-      OPTIONAL { ?film wdt:P57 ?director. }
-      OPTIONAL {
-        ?article schema:about ?film .
-        ?article schema:isPartOf <https://en.wikipedia.org/> .
-      }
-      SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-    }
-    LIMIT 20
-  `;
-  const data = await safeFetch(
-    `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(query)}`
-  );
-  if (!data?.results?.bindings?.length) return [];
 
-  // Deduplicate by title (DISTINCT + OPTIONAL can produce multiple rows per film)
-  const filmMap = new Map();
-  for (const b of data.results.bindings) {
-    const title = b.filmLabel?.value;
-    if (!title || /^Q\d+$/.test(title)) continue;
-    const prev = filmMap.get(title);
-    if (!prev) {
-      filmMap.set(title, { ...b });
-    } else {
-      if (!prev.article?.value && b.article?.value)         prev.article       = b.article;
-      if (!prev.directorLabel?.value && b.directorLabel?.value) prev.directorLabel = b.directorLabel;
-    }
-  }
+  const url = `https://api.themoviedb.org/3/discover/movie` +
+    `?primary_release_date.gte=${fmtD(start)}` +
+    `&primary_release_date.lte=${fmtD(end)}` +
+    `&sort_by=popularity.desc` +
+    `&language=en-US`;
 
-  const movies = [...filmMap.values()].slice(0, 8);
+  const data = await safeFetch(url, {
+    headers: { Authorization: `Bearer ${TMDB_TOKEN}` },
+  });
+  if (!data?.results?.length) return [];
 
-  // Fetch Wikipedia thumbnail for each film in parallel.
-  // Wikipedia film articles almost always use the official movie poster.
-  await Promise.all(movies.map(async m => {
-    const articleUrl = m.article?.value;
-    if (!articleUrl) return;
-    const slug     = articleUrl.replace('https://en.wikipedia.org/wiki/', '');
-    const wikiData = await wikiFetch(`/page/summary/${slug}`);
-    if (wikiData?.thumbnail?.source)            m.posterUrl   = wikiData.thumbnail.source;
-    if (wikiData?.content_urls?.desktop?.page)  m.wikiPageUrl = wikiData.content_urls.desktop.page;
+  return data.results.slice(0, 8).map(m => ({
+    title:     m.title,
+    date:      m.release_date ?? '',
+    posterUrl: m.poster_path ? `https://image.tmdb.org/t/p/w200${m.poster_path}` : null,
+    tmdbUrl:   `https://www.themoviedb.org/movie/${m.id}`,
   }));
-
-  return movies;
 }
 
 // ── Wikipedia API ─────────────────────────────────────────────────────────────
@@ -338,10 +307,11 @@ function renderSongPanel(rec, release, wikiData) {
 
   const rgId = release?.['release-group']?.id;
   if (rgId) {
-    html += `<img class="cover-img"
+    const mbRgUrl = `https://musicbrainz.org/release-group/${escHtml(rgId)}`;
+    html += `<a href="${mbRgUrl}" target="_blank" rel="noopener"><img class="cover-img"
       src="https://coverartarchive.org/release-group/${escHtml(rgId)}/front-250"
       alt="Album cover"
-      onerror="this.style.display='none'">`;
+      onerror="this.style.display='none'"></a>`;
   }
 
   if (release?.date)    html += detail('Release Date', formatDate(release.date));
@@ -503,31 +473,22 @@ function renderMoviePanel(data) {
     return;
   }
 
-  const html = data.map(b => {
-    const title    = b.filmLabel?.value     ?? '';
-    const director = b.directorLabel?.value ?? '';
-    const rawDate  = b.date?.value          ?? '';
-    const dateStr  = rawDate ? formatDate(rawDate.slice(0, 10)) : '';
-    const posterUrl = b.posterUrl  ?? '';
-    const wikiUrl   = b.wikiPageUrl ?? '';
-
-    const titleHtml = wikiUrl
-      ? `<a class="media-link" href="${escHtml(wikiUrl)}" target="_blank" rel="noopener">${escHtml(title)}</a>`
-      : escHtml(title);
-    const imgHtml = posterUrl
-      ? `<img class="item-poster" src="${escHtml(posterUrl)}" alt="" onerror="this.style.display='none'">`
+  const html = data.map(m => {
+    const dateStr   = m.date ? formatDate(m.date) : '';
+    const titleHtml = `<a class="media-link" href="${escHtml(m.tmdbUrl)}" target="_blank" rel="noopener">${escHtml(m.title)}</a>`;
+    const imgHtml   = m.posterUrl
+      ? `<img class="item-poster" src="${escHtml(m.posterUrl)}" alt="" onerror="this.style.display='none'">`
       : '';
-    const wrappedImg = imgHtml && wikiUrl
-      ? `<a href="${escHtml(wikiUrl)}" target="_blank" rel="noopener">${imgHtml}</a>`
-      : imgHtml;
+    const wrappedImg = imgHtml
+      ? `<a href="${escHtml(m.tmdbUrl)}" target="_blank" rel="noopener">${imgHtml}</a>`
+      : '';
 
     return `
       <div class="movie-item">
         ${wrappedImg}
         <div class="movie-info">
           <div class="movie-title">${titleHtml}</div>
-          ${director ? `<div class="movie-director">dir. ${escHtml(director)}</div>` : ''}
-          ${dateStr  ? `<div class="movie-date">${escHtml(dateStr)}</div>`           : ''}
+          ${dateStr ? `<div class="movie-date">${escHtml(dateStr)}</div>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -541,6 +502,10 @@ function renderArtistPanel(mbData, wikiData) {
   const name = wikiData?.title ?? mbData?.name ?? '';
   const area = mbData?.area?.name ?? mbData?.['begin-area']?.name ?? '';
   const began = mbData?.['life-span']?.begin?.split('-')[0] ?? '';
+
+  if (wikiData?.thumbnail?.source) {
+    html += `<img class="artist-photo" src="${escHtml(wikiData.thumbnail.source)}" alt="" onerror="this.style.display='none'">`;
+  }
 
   if (name)  html += `<div class="artist-name">${escHtml(name)}</div>`;
   if (area)  html += `<div class="artist-origin">From ${escHtml(area)}</div>`;
