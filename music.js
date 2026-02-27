@@ -146,11 +146,12 @@ async function getMovieReleases(year, month, day) {
   const end    = new Date(center); end.setUTCDate(end.getUTCDate() + 4);
   const fmtD   = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
   const query = `
-    SELECT DISTINCT ?film ?filmLabel ?directorLabel ?date WHERE {
+    SELECT DISTINCT ?film ?filmLabel ?directorLabel ?date ?poster WHERE {
       ?film wdt:P31 wd:Q11424.
       ?film wdt:P577 ?date.
       FILTER(?date >= "${fmtD(start)}T00:00:00Z"^^xsd:dateTime && ?date <= "${fmtD(end)}T23:59:59Z"^^xsd:dateTime)
       OPTIONAL { ?film wdt:P57 ?director. }
+      OPTIONAL { ?film wdt:P18 ?poster. }
       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
     }
     LIMIT 20
@@ -260,6 +261,14 @@ function detail(label, value) {
 
 function renderSongPanel(rec, release, wikiData) {
   let html = '';
+
+  const rgId = release?.['release-group']?.id;
+  if (rgId) {
+    html += `<img class="cover-img"
+      src="https://coverartarchive.org/release-group/${escHtml(rgId)}/front-250"
+      alt="Album cover"
+      onerror="this.style.display='none'">`;
+  }
 
   if (release?.date)    html += detail('Release Date', formatDate(release.date));
   if (release?.title)   html += detail('Album / Release', release.title);
@@ -371,12 +380,16 @@ function renderTVPanel(data) {
     const network = show.network?.name ?? show.webChannel?.name ?? '';
     const genres  = show.genres?.slice(0, 2).join(', ') ?? '';
     const airdate = ep.airdate ? formatDate(ep.airdate) : '';
+    const img     = show.image?.medium ?? '';
     return `
       <div class="tv-item">
-        <div class="tv-title">${escHtml(show.name ?? ep.name)}</div>
-        ${network ? `<div class="tv-network">${escHtml(network)}</div>` : ''}
-        ${genres  ? `<div class="tv-genre">${escHtml(genres)}</div>`   : ''}
-        ${airdate ? `<div class="tv-date">${escHtml(airdate)}</div>`   : ''}
+        ${img ? `<img class="item-poster" src="${escHtml(img)}" alt="" onerror="this.style.display='none'">` : ''}
+        <div class="tv-info">
+          <div class="tv-title">${escHtml(show.name ?? ep.name)}</div>
+          ${network ? `<div class="tv-network">${escHtml(network)}</div>` : ''}
+          ${genres  ? `<div class="tv-genre">${escHtml(genres)}</div>`   : ''}
+          ${airdate ? `<div class="tv-date">${escHtml(airdate)}</div>`   : ''}
+        </div>
       </div>`;
   }).join('');
 
@@ -404,15 +417,20 @@ function renderMoviePanel(data) {
   }
 
   const html = movies.map(b => {
-    const title    = b.filmLabel?.value     ?? '';
-    const director = b.directorLabel?.value ?? '';
-    const rawDate  = b.date?.value          ?? '';
-    const dateStr  = rawDate ? formatDate(rawDate.slice(0, 10)) : '';
+    const title     = b.filmLabel?.value     ?? '';
+    const director  = b.directorLabel?.value ?? '';
+    const rawDate   = b.date?.value          ?? '';
+    const dateStr   = rawDate ? formatDate(rawDate.slice(0, 10)) : '';
+    const rawPoster = b.poster?.value        ?? '';
+    const posterUrl = rawPoster ? rawPoster.replace(/^http:/, 'https:') + '?width=200' : '';
     return `
       <div class="movie-item">
-        <div class="movie-title">${escHtml(title)}</div>
-        ${director ? `<div class="movie-director">dir. ${escHtml(director)}</div>` : ''}
-        ${dateStr  ? `<div class="movie-date">${escHtml(dateStr)}</div>`           : ''}
+        ${posterUrl ? `<img class="item-poster" src="${escHtml(posterUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        <div class="movie-info">
+          <div class="movie-title">${escHtml(title)}</div>
+          ${director ? `<div class="movie-director">dir. ${escHtml(director)}</div>` : ''}
+          ${dateStr  ? `<div class="movie-date">${escHtml(dateStr)}</div>`           : ''}
+        </div>
       </div>`;
   }).join('');
 
@@ -470,27 +488,39 @@ async function selectRecording(rec) {
 
   renderSongHeader(title, artistName, release);
 
-  // Fire all requests in parallel
+  // Fire each fetch independently; render each panel as soon as its data arrives
   const hasFullDate = date?.year && date?.month && date?.day;
-  const [songWiki, historyData, concurrentData, artistMb, artistWiki, tvData, movieData] = await Promise.all([
-    getSongWiki(title, artistName),
-    date?.month && date?.day ? getOnThisDay(date.month, date.day) : Promise.resolve(null),
-    hasFullDate ? getConcurrentReleases(date.year, date.month, date.day) : Promise.resolve(null),
+
+  getSongWiki(title, artistName)
+    .then(d => renderSongPanel(rec, release, d));
+
+  if (date?.month && date?.day) {
+    getOnThisDay(date.month, date.day)
+      .then(d => renderHistoryPanel(d, date?.year ?? 0));
+  } else {
+    renderHistoryPanel(null, 0);
+  }
+
+  if (hasFullDate) {
+    getConcurrentReleases(date.year, date.month, date.day)
+      .then(d => renderConcurrentPanel(d, title, artistName));
+    getTVPremieres(date.year, date.month, date.day)
+      .then(d => renderTVPanel(d));
+    getMovieReleases(date.year, date.month, date.day)
+      .then(d => renderMoviePanel(d));
+  } else {
+    renderConcurrentPanel(null, title, artistName);
+    renderTVPanel(null);
+    renderMoviePanel(null);
+  }
+
+  // Artist panel needs both MB + Wikipedia; wait for both together
+  Promise.all([
     artistId ? getArtistDetails(artistId) : Promise.resolve(null),
     getWikiSummary(artistName),
-    hasFullDate ? getTVPremieres(date.year, date.month, date.day)  : Promise.resolve(null),
-    hasFullDate ? getMovieReleases(date.year, date.month, date.day) : Promise.resolve(null),
-  ]);
-
-  renderSongPanel(rec, release, songWiki);
-  renderHistoryPanel(historyData, date?.year ?? 0);
-  renderConcurrentPanel(concurrentData, title, artistName);
-  renderTVPanel(tvData);
-  renderMoviePanel(movieData);
-  renderArtistPanel(
-    artistMb,
-    artistWiki?.type === 'disambiguation' ? null : artistWiki
-  );
+  ]).then(([artistMb, artistWiki]) => {
+    renderArtistPanel(artistMb, artistWiki?.type === 'disambiguation' ? null : artistWiki);
+  });
 }
 
 function goToSearch() {
