@@ -68,8 +68,17 @@ function formatDate(dateStr) {
   }
 }
 
-// Lower score = more canonical. Prefer Album/Single with a full US date.
+// Lower score = more canonical. Album/Single before Compilation/Live.
 const RELEASE_TYPE_RANK = { 'Album': 0, 'Single': 1, 'EP': 2, 'Compilation': 3, 'Live': 4 };
+
+// Live albums have primary-type "Album" in MusicBrainz, so check secondary-types
+// first (available when using inc=release-groups on a full recording lookup).
+function releaseTypeScore(r) {
+  const secondary = r['release-group']?.['secondary-types'] ?? [];
+  if (secondary.includes('Live'))        return RELEASE_TYPE_RANK['Live'];
+  if (secondary.includes('Compilation')) return RELEASE_TYPE_RANK['Compilation'];
+  return RELEASE_TYPE_RANK[r['release-group']?.['primary-type']] ?? 5;
+}
 
 function getBestRelease(releases) {
   if (!releases?.length) return null;
@@ -82,12 +91,12 @@ function getBestRelease(releases) {
 
   const isFullDate = r => /^\d{4}-\d{2}-\d{2}$/.test(r.date);
 
-  const scored = dated.map(r => {
-    const type      = RELEASE_TYPE_RANK[r['release-group']?.['primary-type']] ?? 5;
-    const fullDate  = isFullDate(r) ? 0 : 1;
-    const us        = r.country === 'US' ? 0 : 1;
-    return { r, score: type * 100 + fullDate * 10 + us };
-  });
+  // Score by type (studio album wins), then full-date bonus. No country bias —
+  // that was causing US compilations (1981) to outscore the original UK album (1977).
+  const scored = dated.map(r => ({
+    r,
+    score: releaseTypeScore(r) * 100 + (isFullDate(r) ? 0 : 10),
+  }));
 
   scored.sort((a, b) => a.score - b.score || a.r.date.localeCompare(b.r.date));
   return scored[0].r;
@@ -98,6 +107,7 @@ function getBestRelease(releases) {
 async function searchRecordings(title, artist) {
   let q = `recording:"${title.replace(/"/g, '')}"`;
   if (artist) q += ` AND artist:"${artist.replace(/"/g, '')}"`;
+  q += ' AND status:Official';
   const path = `/recording?query=${encodeURIComponent(q)}&fmt=json&limit=50&inc=releases+artist-credits`;
   return mbFetch(path);
 }
@@ -172,20 +182,21 @@ function renderPicker(recordings) {
     return;
   }
 
-  // Sort: release type first (Album < Single < EP < Compilation < Live),
-  // then earliest date (original version before reissues/live recordings),
-  // then MusicBrainz relevance as final tiebreaker.
-  // This surfaces the original studio recording above live/compilation versions.
-  const typeRank = rec => {
-    const rel = getBestRelease(rec.releases);
-    return RELEASE_TYPE_RANK[rel?.['release-group']?.['primary-type']] ?? 5;
+  // Sort by earliest official release date. The original studio recording was
+  // released in 1977; live recordings from concerts are always from later years,
+  // so this naturally surfaces the original version before live/compilation entries.
+  // MB relevance score is used only as a tiebreaker.
+  const earliestDate = rec => {
+    const dates = (rec.releases ?? [])
+      .filter(r => r.date && (r.status === 'Official' || !r.status))
+      .map(r => r.date)
+      .sort();
+    return dates[0] ?? '9999';
   };
 
   const sorted = [...recordings].sort((a, b) => {
-    const typeDiff = typeRank(a) - typeRank(b);
-    if (typeDiff !== 0) return typeDiff;
-    const da = getBestRelease(a.releases)?.date ?? '9999';
-    const db = getBestRelease(b.releases)?.date ?? '9999';
+    const da = earliestDate(a);
+    const db = earliestDate(b);
     if (da !== db) return da.localeCompare(db);
     return (b.score ?? 0) - (a.score ?? 0);
   }).slice(0, 8);
@@ -418,15 +429,21 @@ async function selectRecording(rec) {
   const credit     = rec['artist-credit']?.[0];
   const artistName = credit?.artist?.name ?? 'Unknown';
   const artistId   = credit?.artist?.id ?? null;
-  const release    = getBestRelease(rec.releases);
-  const date       = parseDate(release?.date);
 
   hide('picker-section');
   show('results-section');
   resetPanels();
-  renderSongHeader(title, artistName, release);
-
   el('results-section').scrollIntoView({ behavior: 'smooth' });
+
+  // Full recording lookup: gets ALL releases with release-group secondary-types
+  // (e.g. "Live", "Compilation"), so getBestRelease can correctly prefer the
+  // original studio album over compilations and live albums. The search result
+  // only returns a truncated release list without secondary-types.
+  const fullRec = await mbFetch(`/recording/${rec.id}?fmt=json&inc=releases+artist-credits+release-groups`);
+  const release = getBestRelease(fullRec?.releases ?? rec.releases);
+  const date    = parseDate(release?.date);
+
+  renderSongHeader(title, artistName, release);
 
   // Fire all requests in parallel
   const hasFullDate = date?.year && date?.month && date?.day;
