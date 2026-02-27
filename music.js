@@ -98,7 +98,7 @@ function getBestRelease(releases) {
 async function searchRecordings(title, artist) {
   let q = `recording:"${title.replace(/"/g, '')}"`;
   if (artist) q += ` AND artist:"${artist.replace(/"/g, '')}"`;
-  const path = `/recording?query=${encodeURIComponent(q)}&fmt=json&limit=20&inc=releases+artist-credits`;
+  const path = `/recording?query=${encodeURIComponent(q)}&fmt=json&limit=50&inc=releases+artist-credits`;
   return mbFetch(path);
 }
 
@@ -172,16 +172,22 @@ function renderPicker(recordings) {
     return;
   }
 
-  // Sort: MusicBrainz relevance score first, then release count (popularity proxy),
-  // then earliest canonical date as final tiebreaker
+  // Sort: release type first (Album < Single < EP < Compilation < Live),
+  // then earliest date (original version before reissues/live recordings),
+  // then MusicBrainz relevance as final tiebreaker.
+  // This surfaces the original studio recording above live/compilation versions.
+  const typeRank = rec => {
+    const rel = getBestRelease(rec.releases);
+    return RELEASE_TYPE_RANK[rel?.['release-group']?.['primary-type']] ?? 5;
+  };
+
   const sorted = [...recordings].sort((a, b) => {
-    const scoreDiff = (b.score ?? 0) - (a.score ?? 0);
-    if (scoreDiff !== 0) return scoreDiff;
-    const releaseCountDiff = (b.releases?.length ?? 0) - (a.releases?.length ?? 0);
-    if (releaseCountDiff !== 0) return releaseCountDiff;
+    const typeDiff = typeRank(a) - typeRank(b);
+    if (typeDiff !== 0) return typeDiff;
     const da = getBestRelease(a.releases)?.date ?? '9999';
     const db = getBestRelease(b.releases)?.date ?? '9999';
-    return da.localeCompare(db);
+    if (da !== db) return da.localeCompare(db);
+    return (b.score ?? 0) - (a.score ?? 0);
   }).slice(0, 8);
 
   const items = sorted.map((rec, i) => {
