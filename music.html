@@ -65,6 +65,10 @@
         <button class="btn-ghost" id="new-search-btn">← New Search</button>
       </div>
 
+      <div id="load-progress" hidden>
+        <div id="load-bar"></div>
+      </div>
+
       <div class="results-grid">
 
         <div class="panel panel-gold" id="panel-song-wrap">
@@ -75,14 +79,14 @@
         </div>
 
         <div class="panel panel-red">
-          <div class="panel-title">ON THIS DATE IN HISTORY</div>
+          <div class="panel-title" id="panel-history-title">ON THIS WEEK IN HISTORY</div>
           <div class="panel-body" id="panel-history-body">
             <div class="loading">Loading…</div>
           </div>
         </div>
 
         <div class="panel panel-green">
-          <div class="panel-title">WHAT ELSE DROPPED</div>
+          <div class="panel-title" id="panel-concurrent-title">WHAT ELSE DROPPED</div>
           <div class="panel-body" id="panel-concurrent-body">
             <div class="loading">Loading…</div>
           </div>

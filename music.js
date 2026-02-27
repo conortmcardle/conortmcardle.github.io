@@ -21,6 +21,27 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+// ── Progress Bar ──────────────────────────────────────────────────────────────
+
+let _progressTotal = 0;
+let _progressDone  = 0;
+
+function initProgress(n) {
+  _progressTotal = n;
+  _progressDone  = 0;
+  el('load-bar').style.width = '4%'; // show it's started
+  el('load-progress').hidden = false;
+}
+
+function tickProgress() {
+  _progressDone = Math.min(_progressDone + 1, _progressTotal);
+  const pct = Math.round((_progressDone / _progressTotal) * 100);
+  el('load-bar').style.width = `${pct}%`;
+  if (_progressDone >= _progressTotal) {
+    setTimeout(() => { el('load-progress').hidden = true; }, 700);
+  }
+}
+
 // ── Fetch Helpers ─────────────────────────────────────────────────────────────
 
 async function safeFetch(url, options = {}) {
@@ -200,9 +221,25 @@ async function getMovieReleases(year, month, day) {
 
 // ── Wikipedia API ─────────────────────────────────────────────────────────────
 
-async function getOnThisDay(month, day) {
-  const pad = n => String(n).padStart(2, '0');
-  return wikiFetch(`/feed/onthisday/all/${pad(month)}/${pad(day)}`);
+async function getThisWeekInHistory(year, month, day) {
+  const pad    = n => String(n).padStart(2, '0');
+  const center = new Date(Date.UTC(year, month - 1, day));
+  const fetches = [];
+  for (let offset = -4; offset <= 4; offset++) {
+    const d = new Date(center);
+    d.setUTCDate(d.getUTCDate() + offset);
+    fetches.push(wikiFetch(`/feed/onthisday/all/${pad(d.getUTCMonth() + 1)}/${pad(d.getUTCDate())}`));
+  }
+  const results = await Promise.all(fetches);
+  // Pool events / births / deaths from all 9 days
+  const pool = { events: [], births: [], deaths: [] };
+  for (const r of results) {
+    if (!r) continue;
+    pool.events.push(...(r.events ?? []));
+    pool.births.push(...(r.births ?? []));
+    pool.deaths.push(...(r.deaths ?? []));
+  }
+  return pool;
 }
 
 async function getWikiSummary(title) {
@@ -330,30 +367,35 @@ function renderSongPanel(rec, release, wikiData) {
 
 function renderHistoryPanel(data, releaseYear) {
   if (!data || !releaseYear) {
-    setHTML('panel-history-body', '<p class="no-data">No historical events found for this date.</p>');
+    setHTML('panel-history-body', '<p class="no-data">No historical events found for this period.</p>');
     return;
   }
 
-  const byYear      = arr => (arr ?? []).filter(e => e.year === releaseYear);
-  // Sort any-year list by proximity to release year so nearest years surface first
-  const nearestYear = arr => [...(arr ?? [])].sort((a, b) =>
-    Math.abs(a.year - releaseYear) - Math.abs(b.year - releaseYear));
+  // Filter the week-wide pool to the release year only.
+  // If nothing matched, widen to ±2 years so the panel is never empty.
+  const forYear = (arr, y) => (arr ?? []).filter(e => e.year === y);
+  const forRange = (arr, y, r) => (arr ?? []).filter(e => Math.abs(e.year - y) <= r);
 
-  // Events: prefer release-year matches; fall back to nearest-year events so the
-  // panel always has historical happenings (not just births/deaths).
-  const yearEvents  = byYear(data.events);
-  const eventItems  = yearEvents.length ? yearEvents : nearestYear(data.events).slice(0, 2);
+  let eventItems = forYear(data.events, releaseYear);
+  if (!eventItems.length) eventItems = forRange(data.events, releaseYear, 2);
 
-  // Births/deaths: prefer release year; fall back to nearest year.
-  const birthItems  = (byYear(data.births).length  ? byYear(data.births)  : nearestYear(data.births).slice(0, 1))
+  let birthItems = forYear(data.births, releaseYear).map(e => ({ ...e, text: `Born: ${e.text}` }));
+  if (!birthItems.length) birthItems = forRange(data.births, releaseYear, 2).slice(0, 1)
     .map(e => ({ ...e, text: `Born: ${e.text}` }));
-  const deathItems  = (byYear(data.deaths).length  ? byYear(data.deaths)  : nearestYear(data.deaths).slice(0, 1))
+
+  let deathItems = forYear(data.deaths, releaseYear).map(e => ({ ...e, text: `Died: ${e.text}` }));
+  if (!deathItems.length) deathItems = forRange(data.deaths, releaseYear, 2).slice(0, 1)
     .map(e => ({ ...e, text: `Died: ${e.text}` }));
 
-  const events = [...eventItems, ...birthItems, ...deathItems].slice(0, 4);
+  // Events get priority (3 slots); births/deaths fill remaining space.
+  const events = [
+    ...eventItems.slice(0, 3),
+    ...birthItems.slice(0, 1),
+    ...deathItems.slice(0, 1),
+  ].slice(0, 4);
 
   if (!events.length) {
-    setHTML('panel-history-body', '<p class="no-data">No historical events found for this date.</p>');
+    setHTML('panel-history-body', '<p class="no-data">No historical events found for this period.</p>');
     return;
   }
 
@@ -366,7 +408,7 @@ function renderHistoryPanel(data, releaseYear) {
   setHTML('panel-history-body', html);
 }
 
-function renderConcurrentPanel(data, currentTitle, artistName) {
+function renderConcurrentPanel(data, currentTitle, artistName, maxItems = 8) {
   if (!data?.releases?.length) {
     setHTML('panel-concurrent-body', '<p class="no-data">No concurrent releases found.</p>');
     return;
@@ -382,7 +424,7 @@ function renderConcurrentPanel(data, currentTitle, artistName) {
     seen.add(key);
     return true;
   // Sort by MusicBrainz score descending — higher score = more prominent release
-  }).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 8);
+  }).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, maxItems);
 
   if (!releases.length) {
     setHTML('panel-concurrent-body', '<p class="no-data">No other releases found in this period.</p>');
@@ -530,9 +572,12 @@ function renderDateHeader(year, month, day) {
 function resetPanelsForDate() {
   el('panel-song-wrap').hidden   = true;
   el('panel-artist-wrap').hidden = true;
+  el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
+  el('panel-concurrent-title').textContent = 'MUSIC THIS WEEK';
   ['panel-history-body', 'panel-concurrent-body', 'panel-tv-body', 'panel-movies-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
+  initProgress(4);
 }
 
 async function selectDate(year, month, day) {
@@ -542,22 +587,25 @@ async function selectDate(year, month, day) {
   renderDateHeader(year, month, day);
   el('results-section').scrollIntoView({ behavior: 'smooth' });
 
-  getOnThisDay(month, day)
-    .then(d => renderHistoryPanel(d, year));
+  getThisWeekInHistory(year, month, day)
+    .then(d => { renderHistoryPanel(d, year);         tickProgress(); });
   getConcurrentReleases(year, month, day)
-    .then(d => renderConcurrentPanel(d, '', ''));
+    .then(d => { renderConcurrentPanel(d, '', '', 16); tickProgress(); });
   getTVPremieres(year, month, day)
-    .then(d => renderTVPanel(d));
+    .then(d => { renderTVPanel(d);                    tickProgress(); });
   getMovieReleases(year, month, day)
-    .then(d => renderMoviePanel(d));
+    .then(d => { renderMoviePanel(d);                 tickProgress(); });
 }
 
 function resetPanels() {
   el('panel-song-wrap').hidden   = false;
   el('panel-artist-wrap').hidden = false;
+  el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
+  el('panel-concurrent-title').textContent = 'WHAT ELSE DROPPED';
   ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body', 'panel-tv-body', 'panel-movies-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
+  initProgress(6);
 }
 
 async function selectRecording(rec) {
@@ -585,26 +633,28 @@ async function selectRecording(rec) {
   const hasFullDate = date?.year && date?.month && date?.day;
 
   getSongWiki(title, artistName)
-    .then(d => renderSongPanel(rec, release, d));
+    .then(d => { renderSongPanel(rec, release, d); tickProgress(); });
 
-  if (date?.month && date?.day) {
-    getOnThisDay(date.month, date.day)
-      .then(d => renderHistoryPanel(d, date?.year ?? 0));
+  if (date?.year && date?.month && date?.day) {
+    getThisWeekInHistory(date.year, date.month, date.day)
+      .then(d => { renderHistoryPanel(d, date.year); tickProgress(); });
   } else {
     renderHistoryPanel(null, 0);
+    tickProgress();
   }
 
   if (hasFullDate) {
     getConcurrentReleases(date.year, date.month, date.day)
-      .then(d => renderConcurrentPanel(d, title, artistName));
+      .then(d => { renderConcurrentPanel(d, title, artistName); tickProgress(); });
     getTVPremieres(date.year, date.month, date.day)
-      .then(d => renderTVPanel(d));
+      .then(d => { renderTVPanel(d);                             tickProgress(); });
     getMovieReleases(date.year, date.month, date.day)
-      .then(d => renderMoviePanel(d));
+      .then(d => { renderMoviePanel(d);                          tickProgress(); });
   } else {
     renderConcurrentPanel(null, title, artistName);
     renderTVPanel(null);
     renderMoviePanel(null);
+    tickProgress(); tickProgress(); tickProgress();
   }
 
   // Artist panel needs both MB + Wikipedia; wait for both together
@@ -613,6 +663,7 @@ async function selectRecording(rec) {
     getWikiSummary(artistName),
   ]).then(([artistMb, artistWiki]) => {
     renderArtistPanel(artistMb, artistWiki?.type === 'disambiguation' ? null : artistWiki);
+    tickProgress();
   });
 }
 

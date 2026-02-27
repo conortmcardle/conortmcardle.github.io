@@ -228,6 +228,24 @@
   letter-spacing: 0.1em;
 }
 
+/* ── Load Progress Bar ───────────────────────────────────── */
+#load-progress {
+  width: 100%;
+  height: 3px;
+  background: var(--bg-surface);
+  border-radius: 2px;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+#load-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.35s ease;
+}
+
 /* ── Results Grid ────────────────────────────────────────── */
 .results-grid {
   display: grid;
