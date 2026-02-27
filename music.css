@@ -510,13 +510,24 @@
   color: #fff;
 }
 
+/* ── Media Hyperlinks (TV / Movie titles & posters) ─────── */
+.media-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.media-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ── Cover / Poster Images ───────────────────────────────── */
 .cover-img {
   display: block;
-  width: 140px;
-  height: 140px;
+  width: 220px;
+  height: 220px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 10px;
   margin: 0 auto 1rem;
 }
 

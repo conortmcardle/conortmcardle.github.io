@@ -133,10 +133,11 @@ async function getTVPremieres(year, month, day) {
     d.setUTCDate(d.getUTCDate() + offset);
     dates.push(`${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`);
   }
-  const results = await Promise.all(
-    dates.map(ds => safeFetch(`https://api.tvmaze.com/schedule?date=${ds}&country=US`))
-  );
-  return results.filter(Boolean).flat();
+  const [usResults, ukResults] = await Promise.all([
+    Promise.all(dates.map(ds => safeFetch(`https://api.tvmaze.com/schedule?date=${ds}&country=US`))),
+    Promise.all(dates.map(ds => safeFetch(`https://api.tvmaze.com/schedule?date=${ds}&country=GB`))),
+  ]);
+  return [...usResults.filter(Boolean).flat(), ...ukResults.filter(Boolean).flat()];
 }
 
 async function getMovieReleases(year, month, day) {
@@ -145,20 +146,56 @@ async function getMovieReleases(year, month, day) {
   const start  = new Date(center); start.setUTCDate(start.getUTCDate() - 4);
   const end    = new Date(center); end.setUTCDate(end.getUTCDate() + 4);
   const fmtD   = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  // Fetch Wikipedia article URL alongside film data — Wikipedia thumbnails are
+  // far more reliable movie posters than Wikidata P18 (which is a generic image
+  // that often ends up being a director/actor photo).
   const query = `
-    SELECT DISTINCT ?film ?filmLabel ?directorLabel ?date ?poster WHERE {
+    SELECT DISTINCT ?film ?filmLabel ?directorLabel ?date ?article WHERE {
       ?film wdt:P31 wd:Q11424.
       ?film wdt:P577 ?date.
       FILTER(?date >= "${fmtD(start)}T00:00:00Z"^^xsd:dateTime && ?date <= "${fmtD(end)}T23:59:59Z"^^xsd:dateTime)
       OPTIONAL { ?film wdt:P57 ?director. }
-      OPTIONAL { ?film wdt:P18 ?poster. }
+      OPTIONAL {
+        ?article schema:about ?film .
+        ?article schema:isPartOf <https://en.wikipedia.org/> .
+      }
       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
     }
     LIMIT 20
   `;
-  return safeFetch(
+  const data = await safeFetch(
     `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(query)}`
   );
+  if (!data?.results?.bindings?.length) return [];
+
+  // Deduplicate by title (DISTINCT + OPTIONAL can produce multiple rows per film)
+  const filmMap = new Map();
+  for (const b of data.results.bindings) {
+    const title = b.filmLabel?.value;
+    if (!title || /^Q\d+$/.test(title)) continue;
+    const prev = filmMap.get(title);
+    if (!prev) {
+      filmMap.set(title, { ...b });
+    } else {
+      if (!prev.article?.value && b.article?.value)         prev.article       = b.article;
+      if (!prev.directorLabel?.value && b.directorLabel?.value) prev.directorLabel = b.directorLabel;
+    }
+  }
+
+  const movies = [...filmMap.values()].slice(0, 8);
+
+  // Fetch Wikipedia thumbnail for each film in parallel.
+  // Wikipedia film articles almost always use the official movie poster.
+  await Promise.all(movies.map(async m => {
+    const articleUrl = m.article?.value;
+    if (!articleUrl) return;
+    const slug     = articleUrl.replace('https://en.wikipedia.org/wiki/', '');
+    const wikiData = await wikiFetch(`/page/summary/${slug}`);
+    if (wikiData?.thumbnail?.source)            m.posterUrl   = wikiData.thumbnail.source;
+    if (wikiData?.content_urls?.desktop?.page)  m.wikiPageUrl = wikiData.content_urls.desktop.page;
+  }));
+
+  return movies;
 }
 
 // ── Wikipedia API ─────────────────────────────────────────────────────────────
@@ -297,13 +334,23 @@ function renderHistoryPanel(data, releaseYear) {
     return;
   }
 
-  // Combine events, births and deaths all from the exact release year.
-  const byYear = arr => (arr ?? []).filter(e => e.year === releaseYear);
-  const events = [
-    ...byYear(data.events),
-    ...byYear(data.births).map(e => ({ ...e, text: `Born: ${e.text}` })),
-    ...byYear(data.deaths).map(e => ({ ...e, text: `Died: ${e.text}` })),
-  ].slice(0, 4);
+  const byYear      = arr => (arr ?? []).filter(e => e.year === releaseYear);
+  // Sort any-year list by proximity to release year so nearest years surface first
+  const nearestYear = arr => [...(arr ?? [])].sort((a, b) =>
+    Math.abs(a.year - releaseYear) - Math.abs(b.year - releaseYear));
+
+  // Events: prefer release-year matches; fall back to nearest-year events so the
+  // panel always has historical happenings (not just births/deaths).
+  const yearEvents  = byYear(data.events);
+  const eventItems  = yearEvents.length ? yearEvents : nearestYear(data.events).slice(0, 2);
+
+  // Births/deaths: prefer release year; fall back to nearest year.
+  const birthItems  = (byYear(data.births).length  ? byYear(data.births)  : nearestYear(data.births).slice(0, 1))
+    .map(e => ({ ...e, text: `Born: ${e.text}` }));
+  const deathItems  = (byYear(data.deaths).length  ? byYear(data.deaths)  : nearestYear(data.deaths).slice(0, 1))
+    .map(e => ({ ...e, text: `Died: ${e.text}` }));
+
+  const events = [...eventItems, ...birthItems, ...deathItems].slice(0, 4);
 
   if (!events.length) {
     setHTML('panel-history-body', '<p class="no-data">No historical events found for this date.</p>');
@@ -334,7 +381,8 @@ function renderConcurrentPanel(data, currentTitle, artistName) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).slice(0, 8);
+  // Sort by MusicBrainz score descending — higher score = more prominent release
+  }).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 8);
 
   if (!releases.length) {
     setHTML('panel-concurrent-body', '<p class="no-data">No other releases found in this period.</p>');
@@ -381,11 +429,22 @@ function renderTVPanel(data) {
     const genres  = show.genres?.slice(0, 2).join(', ') ?? '';
     const airdate = ep.airdate ? formatDate(ep.airdate) : '';
     const img     = show.image?.medium ?? '';
+    const tvUrl   = show.url ?? '';
+    const showName = escHtml(show.name ?? ep.name);
+    const titleHtml = tvUrl
+      ? `<a class="media-link" href="${escHtml(tvUrl)}" target="_blank" rel="noopener">${showName}</a>`
+      : showName;
+    const imgHtml = img
+      ? `<img class="item-poster" src="${escHtml(img)}" alt="" onerror="this.style.display='none'">`
+      : '';
+    const wrappedImg = imgHtml && tvUrl
+      ? `<a href="${escHtml(tvUrl)}" target="_blank" rel="noopener">${imgHtml}</a>`
+      : imgHtml;
     return `
       <div class="tv-item">
-        ${img ? `<img class="item-poster" src="${escHtml(img)}" alt="" onerror="this.style.display='none'">` : ''}
+        ${wrappedImg}
         <div class="tv-info">
-          <div class="tv-title">${escHtml(show.name ?? ep.name)}</div>
+          <div class="tv-title">${titleHtml}</div>
           ${network ? `<div class="tv-network">${escHtml(network)}</div>` : ''}
           ${genres  ? `<div class="tv-genre">${escHtml(genres)}</div>`   : ''}
           ${airdate ? `<div class="tv-date">${escHtml(airdate)}</div>`   : ''}
@@ -397,52 +456,41 @@ function renderTVPanel(data) {
 }
 
 function renderMoviePanel(data) {
-  const bindings = data?.results?.bindings ?? [];
-  if (!bindings.length) {
+  if (!Array.isArray(data) || !data.length) {
     setHTML('panel-movies-body', '<p class="no-data">No movies found for this date.</p>');
     return;
   }
 
-  // Merge duplicate rows (caused by DISTINCT + OPTIONAL combos in SPARQL)
-  // so poster/director from any row are preserved for each unique title.
-  const filmMap = new Map();
-  for (const b of bindings) {
-    const title = b.filmLabel?.value;
-    if (!title || /^Q\d+$/.test(title)) continue;
-    const prev = filmMap.get(title);
-    if (!prev) {
-      filmMap.set(title, { ...b });
-    } else {
-      if (!prev.poster?.value && b.poster?.value) prev.poster = b.poster;
-      if (!prev.directorLabel?.value && b.directorLabel?.value) prev.directorLabel = b.directorLabel;
-    }
-  }
-  const movies = [...filmMap.values()].slice(0, 8);
+  const html = data.map(b => {
+    const title    = b.filmLabel?.value     ?? '';
+    const director = b.directorLabel?.value ?? '';
+    const rawDate  = b.date?.value          ?? '';
+    const dateStr  = rawDate ? formatDate(rawDate.slice(0, 10)) : '';
+    const posterUrl = b.posterUrl  ?? '';
+    const wikiUrl   = b.wikiPageUrl ?? '';
 
-  if (!movies.length) {
-    setHTML('panel-movies-body', '<p class="no-data">No movies found for this date.</p>');
-    return;
-  }
+    const titleHtml = wikiUrl
+      ? `<a class="media-link" href="${escHtml(wikiUrl)}" target="_blank" rel="noopener">${escHtml(title)}</a>`
+      : escHtml(title);
+    const imgHtml = posterUrl
+      ? `<img class="item-poster" src="${escHtml(posterUrl)}" alt="" onerror="this.style.display='none'">`
+      : '';
+    const wrappedImg = imgHtml && wikiUrl
+      ? `<a href="${escHtml(wikiUrl)}" target="_blank" rel="noopener">${imgHtml}</a>`
+      : imgHtml;
 
-  const html = movies.map(b => {
-    const title     = b.filmLabel?.value     ?? '';
-    const director  = b.directorLabel?.value ?? '';
-    const rawDate   = b.date?.value          ?? '';
-    const dateStr   = rawDate ? formatDate(rawDate.slice(0, 10)) : '';
-    const rawPoster = b.poster?.value        ?? '';
-    const posterUrl = rawPoster ? rawPoster.replace(/^http:/, 'https:') + '?width=200' : '';
     return `
       <div class="movie-item">
-        ${posterUrl ? `<img class="item-poster" src="${escHtml(posterUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        ${wrappedImg}
         <div class="movie-info">
-          <div class="movie-title">${escHtml(title)}</div>
+          <div class="movie-title">${titleHtml}</div>
           ${director ? `<div class="movie-director">dir. ${escHtml(director)}</div>` : ''}
           ${dateStr  ? `<div class="movie-date">${escHtml(dateStr)}</div>`           : ''}
         </div>
       </div>`;
   }).join('');
 
-  setHTML('panel-movies-body', html);
+  setHTML('panel-movies-body', html || '<p class="no-data">No movies found for this date.</p>');
 }
 
 function renderArtistPanel(mbData, wikiData) {
