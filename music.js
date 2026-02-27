@@ -148,8 +148,10 @@ function renderPicker(recordings) {
     return;
   }
 
-  // Sort: canonical studio/single releases first (earliest best-release date)
+  // Sort: MusicBrainz relevance score first, then earliest canonical date as tiebreaker
   const sorted = [...recordings].sort((a, b) => {
+    const scoreDiff = (b.score ?? 0) - (a.score ?? 0);
+    if (scoreDiff !== 0) return scoreDiff;
     const da = getBestRelease(a.releases)?.date ?? '9999';
     const db = getBestRelease(b.releases)?.date ?? '9999';
     return da.localeCompare(db);
