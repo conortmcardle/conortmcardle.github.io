@@ -68,23 +68,29 @@ function formatDate(dateStr) {
   }
 }
 
+// Lower score = more canonical. Prefer Album/Single with a full US date.
+const RELEASE_TYPE_RANK = { 'Album': 0, 'Single': 1, 'EP': 2, 'Compilation': 3, 'Live': 4 };
+
 function getBestRelease(releases) {
   if (!releases?.length) return null;
-  const dated = releases.filter(r => r.date);
-  if (!dated.length) return releases[0];
 
-  const sorted = [...dated].sort((a, b) => a.date.localeCompare(b.date));
+  const official = releases.filter(r => r.status === 'Official' || !r.status);
+  const pool = official.length ? official : releases;
+
+  const dated = pool.filter(r => r.date);
+  if (!dated.length) return pool[0] ?? releases[0];
+
   const isFullDate = r => /^\d{4}-\d{2}-\d{2}$/.test(r.date);
 
-  // Prefer earliest US release with a full YYYY-MM-DD date
-  const usFullDate = sorted.find(r => r.country === 'US' && isFullDate(r));
-  if (usFullDate) return usFullDate;
+  const scored = dated.map(r => {
+    const type      = RELEASE_TYPE_RANK[r['release-group']?.['primary-type']] ?? 5;
+    const fullDate  = isFullDate(r) ? 0 : 1;
+    const us        = r.country === 'US' ? 0 : 1;
+    return { r, score: type * 100 + fullDate * 10 + us };
+  });
 
-  // Any release with a full date
-  const anyFullDate = sorted.find(r => isFullDate(r));
-  if (anyFullDate) return anyFullDate;
-
-  return sorted[0];
+  scored.sort((a, b) => a.score - b.score || a.r.date.localeCompare(b.r.date));
+  return scored[0].r;
 }
 
 // ── MusicBrainz API ───────────────────────────────────────────────────────────
@@ -92,7 +98,7 @@ function getBestRelease(releases) {
 async function searchRecordings(title, artist) {
   let q = `recording:"${title.replace(/"/g, '')}"`;
   if (artist) q += ` AND artist:"${artist.replace(/"/g, '')}"`;
-  const path = `/recording?query=${encodeURIComponent(q)}&fmt=json&limit=8&inc=releases+artist-credits`;
+  const path = `/recording?query=${encodeURIComponent(q)}&fmt=json&limit=20&inc=releases+artist-credits`;
   return mbFetch(path);
 }
 
@@ -100,13 +106,10 @@ async function getArtistDetails(artistId) {
   return mbFetch(`/artist/${artistId}?fmt=json`);
 }
 
-async function getConcurrentReleases(year, month) {
+async function getConcurrentReleases(year, month, day) {
   const pad = n => String(n).padStart(2, '0');
-  const m1 = pad(Math.max(1, month - 1));
-  const m2 = pad(Math.min(12, month + 1));
-  const dateFrom = `${year}-${m1}-01`;
-  const dateTo   = `${year}-${m2}-31`;
-  const q = `date:[${dateFrom} TO ${dateTo}] AND status:Official`;
+  const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+  const q = `date:${dateStr} AND status:Official`;
   const path = `/release?query=${encodeURIComponent(q)}&fmt=json&limit=25&inc=artist-credits`;
   return mbFetch(path);
 }
@@ -145,7 +148,14 @@ function renderPicker(recordings) {
     return;
   }
 
-  const items = recordings.map((rec, i) => {
+  // Sort: canonical studio/single releases first (earliest best-release date)
+  const sorted = [...recordings].sort((a, b) => {
+    const da = getBestRelease(a.releases)?.date ?? '9999';
+    const db = getBestRelease(b.releases)?.date ?? '9999';
+    return da.localeCompare(db);
+  }).slice(0, 8);
+
+  const items = sorted.map((rec, i) => {
     const artist  = rec['artist-credit']?.[0]?.artist?.name ?? 'Unknown Artist';
     const release = getBestRelease(rec.releases);
     const date    = release?.date ? formatDate(release.date) : 'Date unknown';
@@ -167,7 +177,7 @@ function renderPicker(recordings) {
 
   document.querySelectorAll('.picker-item').forEach(item => {
     item.addEventListener('click', () => {
-      selectRecording(recordings[parseInt(item.dataset.index, 10)]);
+      selectRecording(sorted[parseInt(item.dataset.index, 10)]);
     });
   });
 }
@@ -215,27 +225,20 @@ function renderSongPanel(rec, release, wikiData) {
 }
 
 function renderHistoryPanel(data, releaseYear) {
-  if (!data?.events?.length) {
-    setHTML('panel-history-body', '<p class="no-data">No historical events found for this date.</p>');
+  const events = (data?.events ?? []).filter(e => e.year === releaseYear);
+
+  if (!events.length) {
+    const msg = releaseYear
+      ? `No recorded events found for ${releaseYear} on this date.`
+      : 'No historical events found for this date.';
+    setHTML('panel-history-body', `<p class="no-data">${msg}</p>`);
     return;
   }
 
-  // Sort: events near release year first, then everything else
-  const sorted = [...data.events].sort((a, b) => {
-    const aDiff = Math.abs(a.year - releaseYear);
-    const bDiff = Math.abs(b.year - releaseYear);
-    return aDiff - bDiff;
-  });
-
-  const shown = sorted.slice(0, 10);
-  const html = shown.map(event => {
-    const isNear = Math.abs(event.year - releaseYear) <= 10;
-    return `
-      <div class="history-event">
-        <div class="history-year ${isNear ? 'year-near' : ''}">${event.year}</div>
-        <div class="history-text">${escHtml(event.text)}</div>
-      </div>`;
-  }).join('');
+  const html = events.map(event => `
+    <div class="history-event">
+      <div class="history-text">${escHtml(event.text)}</div>
+    </div>`).join('');
 
   setHTML('panel-history-body', html);
 }
@@ -325,7 +328,7 @@ async function selectRecording(rec) {
   const [songWiki, historyData, concurrentData, artistMb, artistWiki] = await Promise.all([
     getSongWiki(title, artistName),
     date?.month && date?.day ? getOnThisDay(date.month, date.day) : Promise.resolve(null),
-    date?.year  && date?.month ? getConcurrentReleases(date.year, date.month) : Promise.resolve(null),
+    date?.year && date?.month && date?.day ? getConcurrentReleases(date.year, date.month, date.day) : Promise.resolve(null),
     artistId ? getArtistDetails(artistId) : Promise.resolve(null),
     getWikiSummary(artistName),
   ]);
