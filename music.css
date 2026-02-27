@@ -482,6 +482,34 @@
   margin-top: 0.1rem;
 }
 
+/* ── Mode Tabs ───────────────────────────────────────────── */
+.mode-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.mode-tab {
+  padding: 0.4rem 1.2rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mode-tab.active,
+.mode-tab:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* ── Cover / Poster Images ───────────────────────────────── */
 .cover-img {
   display: block;
