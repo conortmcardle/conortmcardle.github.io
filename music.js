@@ -863,9 +863,16 @@ function parseTextDate(str) {
   let m = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
   if (m) return { year: +m[1], month: +m[2], day: +m[3] };
 
-  // DD/MM/YYYY  DD-MM-YYYY  DD.MM.YYYY
-  m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
-  if (m) return { year: +m[3], month: +m[2], day: +m[1] };
+  // Numeric: MM/DD/YY, DD/MM/YYYY, etc. — slash, dash, or dot, 2- or 4-digit year
+  m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (m) {
+    const a  = +m[1], b = +m[2];
+    const yr = m[3].length === 2 ? (+m[3] <= 30 ? 2000 + +m[3] : 1900 + +m[3]) : +m[3];
+    // Unambiguous: whichever part exceeds 12 must be the day
+    if (b > 12) return { year: yr, month: a, day: b };  // M/D/Y  e.g. 9/22/88
+    if (a > 12) return { year: yr, month: b, day: a };  // D/M/Y  e.g. 22/9/88
+    return { year: yr, month: a, day: b };               // ambiguous → M/D/Y
+  }
 
   // "14 June 1955"
   m = str.match(/^(\d{1,2})\s+([A-Za-z]+)[,\s]+(\d{4})$/);
