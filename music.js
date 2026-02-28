@@ -5,6 +5,7 @@
 const MB_API      = 'https://musicbrainz.org/ws/2';
 const WIKI_API    = 'https://en.wikipedia.org/api/rest_v1';
 const TMDB_TOKEN  = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIwYzk3Y2ZmNGE2NDY5MWM5NTgxNjgzMzNmNWJjZGQyMyIsIm5iZiI6MTUxMzAxNzA4OC40NzksInN1YiI6IjVhMmVjZjAwOTI1MTQxMDMyYzE2OTAwOCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.TsyvP2XLtoS-QMCAVaLUF4MpONaDoK61-z4CXYjz2N0';
+const RAWG_KEY    = ''; // Free key at https://rawg.io/apidocs
 const MB_HEADERS  = { 'User-Agent': 'WhenItDropped/1.0 (https://conortmcardle.github.io)' };
 
 // ── DOM Helpers ───────────────────────────────────────────────────────────────
@@ -213,6 +214,54 @@ async function getMovieReleases(year, month, day) {
     directors: m._directors ?? [],
     writers:   m._writers   ?? [],
   }));
+}
+
+async function getItunesPreview(title, artist) {
+  const term = encodeURIComponent(`${title} ${artist}`);
+  const data = await safeFetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=5&media=music`);
+  if (!data?.results?.length) return null;
+  const lo = s => s?.toLowerCase() ?? '';
+  return data.results.find(r => lo(r.trackName).includes(lo(title))) ?? data.results[0];
+}
+
+async function getBookReleases(year) {
+  return safeFetch(
+    `https://openlibrary.org/search.json?q=*&publish_year=${year}&sort=editions&limit=8&fields=title,author_name,cover_i,key&language=eng`
+  );
+}
+
+async function getBroadwayShows(year, month, day) {
+  const pad  = n => String(n).padStart(2, '0');
+  const c    = new Date(Date.UTC(year, month - 1, day));
+  const s    = new Date(c); s.setUTCDate(s.getUTCDate() - 90);
+  const e    = new Date(c); e.setUTCDate(e.getUTCDate() + 90);
+  const fmtD = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+
+  const sparql = `
+    SELECT DISTINCT ?show ?showLabel ?date WHERE {
+      VALUES ?type { wd:Q7725310 wd:Q188473 wd:Q46261 }
+      ?show wdt:P31 ?type.
+      ?show wdt:P1191 ?date.
+      FILTER(?date >= "${fmtD(s)}"^^xsd:dateTime && ?date <= "${fmtD(e)}"^^xsd:dateTime)
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+    } ORDER BY ?date LIMIT 8`;
+
+  return safeFetch(
+    `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`,
+    { headers: { Accept: 'application/sparql-results+json' } }
+  );
+}
+
+async function getGameReleases(year, month, day) {
+  if (!RAWG_KEY) return null;
+  const pad  = n => String(n).padStart(2, '0');
+  const c    = new Date(Date.UTC(year, month - 1, day));
+  const s    = new Date(c); s.setUTCDate(s.getUTCDate() - 30);
+  const e    = new Date(c); e.setUTCDate(e.getUTCDate() + 30);
+  const fmtD = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  return safeFetch(
+    `https://api.rawg.io/api/games?key=${RAWG_KEY}&dates=${fmtD(s)},${fmtD(e)}&ordering=-rating&page_size=8`
+  );
 }
 
 // ── Wikipedia API ─────────────────────────────────────────────────────────────
@@ -509,9 +558,12 @@ function renderConcurrentPanel(data, currentTitle, artistName, maxItems = 8) {
     const dateStr = r.date ? formatDate(r.date) : '';
     return `
       <div class="concurrent-item">
-        <div class="concurrent-title">${escHtml(r.title)}</div>
-        <div class="concurrent-artist">${escHtml(artist)}</div>
-        ${dateStr ? `<div class="concurrent-date">${escHtml(dateStr)}</div>` : ''}
+        <div class="concurrent-info">
+          <div class="concurrent-title">${escHtml(r.title)}</div>
+          <div class="concurrent-artist">${escHtml(artist)}</div>
+          ${dateStr ? `<div class="concurrent-date">${escHtml(dateStr)}</div>` : ''}
+        </div>
+        <button class="preview-btn" data-title="${escHtml(r.title)}" data-artist="${escHtml(artist)}" aria-label="Preview">▶</button>
       </div>`;
   }).join('');
 
@@ -604,6 +656,126 @@ function renderMoviePanel(data) {
   setHTML('panel-movies-body', html || '<p class="no-data">No movies found for this date.</p>');
 }
 
+function renderBookPanel(data) {
+  if (!data?.docs?.length) {
+    setHTML('panel-books-body', '<p class="no-data">No books found for this period.</p>');
+    return;
+  }
+
+  const html = data.docs.filter(b => b.title).slice(0, 8).map(b => {
+    const author  = b.author_name?.[0] ?? 'Unknown';
+    const olUrl   = b.key ? `https://openlibrary.org${b.key}` : null;
+    const titleHtml = olUrl
+      ? `<a class="media-link" href="${escHtml(olUrl)}" target="_blank" rel="noopener">${escHtml(b.title)}</a>`
+      : escHtml(b.title);
+    return `
+      <div class="book-item">
+        ${b.cover_i ? `<img class="book-cover" src="https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg" alt="" loading="lazy">` : ''}
+        <div class="book-info">
+          <div class="book-title">${titleHtml}</div>
+          <div class="book-author">${escHtml(author)}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  setHTML('panel-books-body', html || '<p class="no-data">No books found for this period.</p>');
+}
+
+function renderBroadwayPanel(data) {
+  const bindings = data?.results?.bindings;
+  if (!bindings?.length) {
+    setHTML('panel-broadway-body', '<p class="no-data">No theatrical productions found for this period.</p>');
+    return;
+  }
+
+  const seen = new Set();
+  const shows = bindings.filter(b => {
+    const label = b.showLabel?.value;
+    if (!label || /^Q\d+$/.test(label) || seen.has(label)) return false;
+    seen.add(label);
+    return true;
+  });
+
+  if (!shows.length) {
+    setHTML('panel-broadway-body', '<p class="no-data">No theatrical productions found for this period.</p>');
+    return;
+  }
+
+  const html = shows.map(b => {
+    const label   = b.showLabel.value;
+    const date    = b.date?.value?.split('T')[0] ?? '';
+    const wdUrl   = b.show?.value ?? '';
+    const titleHtml = wdUrl
+      ? `<a class="media-link" href="${escHtml(wdUrl)}" target="_blank" rel="noopener">${escHtml(label)}</a>`
+      : escHtml(label);
+    return `
+      <div class="broadway-item">
+        <div class="broadway-title">${titleHtml}</div>
+        ${date ? `<div class="broadway-date">${escHtml(formatDate(date))}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  setHTML('panel-broadway-body', html);
+}
+
+function renderGamePanel(data) {
+  if (!RAWG_KEY) {
+    setHTML('panel-games-body', '<p class="no-data">Add a free <a class="wiki-link" href="https://rawg.io/apidocs" target="_blank" rel="noopener">RAWG API key</a> in music.js to enable this panel.</p>');
+    return;
+  }
+  if (!data?.results?.length) {
+    setHTML('panel-games-body', '<p class="no-data">No video game releases found for this period.</p>');
+    return;
+  }
+
+  const html = data.results.map(g => {
+    const genres   = g.genres?.map(x => x.name).join(', ') ?? '';
+    const gameUrl  = `https://rawg.io/games/${escHtml(String(g.slug ?? g.id))}`;
+    return `
+      <div class="game-item">
+        ${g.background_image ? `<img class="game-img" src="${escHtml(g.background_image)}" alt="" loading="lazy">` : ''}
+        <div class="game-info">
+          <div class="game-title"><a class="media-link" href="${gameUrl}" target="_blank" rel="noopener">${escHtml(g.name)}</a></div>
+          ${genres ? `<div class="game-genre">${escHtml(genres)}</div>` : ''}
+          ${g.released ? `<div class="game-date">${escHtml(formatDate(g.released))}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  setHTML('panel-games-body', html);
+}
+
+// ── iTunes Preview ─────────────────────────────────────────────────────────────
+
+let _previewAudio = null;
+let _previewBtn   = null;
+
+function stopCurrentPreview() {
+  if (_previewAudio) { _previewAudio.pause(); _previewAudio = null; }
+  if (_previewBtn)   { _previewBtn.textContent = '▶'; _previewBtn.disabled = false; _previewBtn = null; }
+}
+
+async function playPreview(btn, title, artist) {
+  if (_previewBtn === btn) { stopCurrentPreview(); return; }
+  stopCurrentPreview();
+
+  btn.textContent = '…';
+  btn.disabled    = true;
+
+  const track = await getItunesPreview(title, artist);
+  if (!track?.previewUrl) { btn.textContent = '–'; return; }
+
+  const audio = new Audio(track.previewUrl);
+  _previewAudio = audio;
+  _previewBtn   = btn;
+  btn.textContent = '⏸';
+  btn.disabled    = false;
+
+  audio.volume = 0.7;
+  audio.addEventListener('ended', stopCurrentPreview);
+  audio.play().catch(() => stopCurrentPreview());
+}
+
 function renderArtistPanel(mbData, wikiData) {
   let html = '';
 
@@ -647,10 +819,11 @@ function resetPanelsForDate() {
   el('panel-artist-wrap').hidden = true;
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'MUSIC THIS WEEK';
-  ['panel-history-body', 'panel-concurrent-body', 'panel-tv-body', 'panel-movies-body'].forEach(id => {
+  ['panel-history-body', 'panel-concurrent-body', 'panel-tv-body', 'panel-movies-body',
+   'panel-books-body', 'panel-broadway-body', 'panel-games-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
-  initProgress(4);
+  initProgress(7);
 }
 
 async function selectDate(year, month, day) {
@@ -661,13 +834,19 @@ async function selectDate(year, month, day) {
   el('results-section').scrollIntoView({ behavior: 'smooth' });
 
   getThisWeekInHistory(year, month, day)
-    .then(d => { renderHistoryPanel(d, year);         tickProgress(); });
+    .then(d => { renderHistoryPanel(d, year);          tickProgress(); });
   getConcurrentReleases(year, month, day)
     .then(d => { renderConcurrentPanel(d, '', '', 16); tickProgress(); });
   getTVPremieres(year, month, day)
-    .then(d => { renderTVPanel(d);                    tickProgress(); });
+    .then(d => { renderTVPanel(d);                     tickProgress(); });
   getMovieReleases(year, month, day)
-    .then(d => { renderMoviePanel(d);                 tickProgress(); });
+    .then(d => { renderMoviePanel(d);                  tickProgress(); });
+  getBookReleases(year)
+    .then(d => { renderBookPanel(d);                   tickProgress(); });
+  getBroadwayShows(year, month, day)
+    .then(d => { renderBroadwayPanel(d);               tickProgress(); });
+  getGameReleases(year, month, day)
+    .then(d => { renderGamePanel(d);                   tickProgress(); });
 }
 
 function resetPanels() {
@@ -675,10 +854,11 @@ function resetPanels() {
   el('panel-artist-wrap').hidden = false;
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'WHAT ELSE DROPPED';
-  ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body', 'panel-tv-body', 'panel-movies-body'].forEach(id => {
+  ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body',
+   'panel-tv-body', 'panel-movies-body', 'panel-books-body', 'panel-broadway-body', 'panel-games-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
-  initProgress(6);
+  initProgress(9);
 }
 
 async function selectRecording(rec) {
@@ -709,6 +889,20 @@ async function selectRecording(rec) {
   getSongWiki(title, artistName)
     .then(d => { renderSongPanel(rec, release, d); tickProgress(); });
 
+  // Best-effort iTunes preview — appended to the song panel when ready, no progress tick
+  getItunesPreview(title, artistName).then(track => {
+    if (!track?.previewUrl) return;
+    const body = el('panel-song-body');
+    if (!body || body.querySelector('.preview-section')) return;
+    body.insertAdjacentHTML('beforeend', `
+      <div class="preview-section">
+        <div class="detail-label">PREVIEW</div>
+        <audio class="preview-audio" controls preload="none">
+          <source src="${escHtml(track.previewUrl)}" type="audio/mp4">
+        </audio>
+      </div>`);
+  });
+
   if (date?.year && date?.month && date?.day) {
     getThisWeekInHistory(date.year, date.month, date.day)
       .then(d => { renderHistoryPanel(d, date.year); tickProgress(); });
@@ -724,11 +918,24 @@ async function selectRecording(rec) {
       .then(d => { renderTVPanel(d);                             tickProgress(); });
     getMovieReleases(date.year, date.month, date.day)
       .then(d => { renderMoviePanel(d);                          tickProgress(); });
+    getBroadwayShows(date.year, date.month, date.day)
+      .then(d => { renderBroadwayPanel(d);                       tickProgress(); });
+    getGameReleases(date.year, date.month, date.day)
+      .then(d => { renderGamePanel(d);                           tickProgress(); });
   } else {
     renderConcurrentPanel(null, title, artistName);
     renderTVPanel(null);
     renderMoviePanel(null);
-    tickProgress(); tickProgress(); tickProgress();
+    renderBroadwayPanel(null);
+    renderGamePanel(null);
+    tickProgress(); tickProgress(); tickProgress(); tickProgress(); tickProgress();
+  }
+
+  if (date?.year) {
+    getBookReleases(date.year).then(d => { renderBookPanel(d); tickProgress(); });
+  } else {
+    renderBookPanel(null);
+    tickProgress();
   }
 
   // Artist panel needs both MB + Wikipedia; wait for both together
@@ -780,11 +987,24 @@ async function selectReleaseGroup(rg) {
       .then(d => { renderTVPanel(d);                                tickProgress(); });
     getMovieReleases(date.year, date.month, date.day)
       .then(d => { renderMoviePanel(d);                             tickProgress(); });
+    getBroadwayShows(date.year, date.month, date.day)
+      .then(d => { renderBroadwayPanel(d);                          tickProgress(); });
+    getGameReleases(date.year, date.month, date.day)
+      .then(d => { renderGamePanel(d);                              tickProgress(); });
   } else {
     renderConcurrentPanel(null, rg.title, artistName);
     renderTVPanel(null);
     renderMoviePanel(null);
-    tickProgress(); tickProgress(); tickProgress();
+    renderBroadwayPanel(null);
+    renderGamePanel(null);
+    tickProgress(); tickProgress(); tickProgress(); tickProgress(); tickProgress();
+  }
+
+  if (date?.year) {
+    getBookReleases(date.year).then(d => { renderBookPanel(d); tickProgress(); });
+  } else {
+    renderBookPanel(null);
+    tickProgress();
   }
 
   Promise.all([
@@ -797,6 +1017,7 @@ async function selectReleaseGroup(rg) {
 }
 
 function goToSearch() {
+  stopCurrentPreview();
   hide('picker-section');
   hide('results-section');
   el('search-section').scrollIntoView({ behavior: 'smooth' });
@@ -916,4 +1137,11 @@ el('date-form').addEventListener('submit', e => {
   }
   el('date-input').setCustomValidity('');
   selectDate(parsed.year, parsed.month, parsed.day);
+});
+
+// Delegated listener for concurrent-panel preview buttons (added once; survives re-renders)
+el('panel-concurrent-body').addEventListener('click', async e => {
+  const btn = e.target.closest('.preview-btn');
+  if (!btn) return;
+  await playPreview(btn, btn.dataset.title, btn.dataset.artist);
 });
