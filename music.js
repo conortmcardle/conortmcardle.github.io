@@ -225,24 +225,27 @@ async function getItunesPreview(title, artist) {
 }
 
 async function getBookReleases(year) {
+  // Solr query syntax: first_publish_year:YYYY — books first published in that year,
+  // sorted by edition count (a reliable popularity proxy). No API key needed.
   return safeFetch(
-    `https://openlibrary.org/search.json?q=*&publish_year=${year}&sort=editions&limit=8&fields=title,author_name,cover_i,key&language=eng`
+    `https://openlibrary.org/search.json?q=first_publish_year:${year}&sort=editions&limit=10&fields=title,author_name,cover_i,key`
   );
 }
 
 async function getBroadwayShows(year, month, day) {
   const pad  = n => String(n).padStart(2, '0');
   const c    = new Date(Date.UTC(year, month - 1, day));
-  const s    = new Date(c); s.setUTCDate(s.getUTCDate() - 90);
-  const e    = new Date(c); e.setUTCDate(e.getUTCDate() + 90);
+  const s    = new Date(c); s.setUTCDate(s.getUTCDate() - 20);
+  const e    = new Date(c); e.setUTCDate(e.getUTCDate() + 20);
   const fmtD = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 
+  // P1191 = "date of first performance". Use SUBSTR to compare just the YYYY-MM-DD
+  // portion — avoids xsd:dateTime vs "YYYY-MM-DDT00:00:00Z" mismatch in Wikidata.
   const sparql = `
     SELECT DISTINCT ?show ?showLabel ?date WHERE {
-      VALUES ?type { wd:Q7725310 wd:Q188473 wd:Q46261 }
-      ?show wdt:P31 ?type.
       ?show wdt:P1191 ?date.
-      FILTER(?date >= "${fmtD(s)}"^^xsd:dateTime && ?date <= "${fmtD(e)}"^^xsd:dateTime)
+      BIND(SUBSTR(str(?date), 1, 10) AS ?dateStr)
+      FILTER(?dateStr >= "${fmtD(s)}" && ?dateStr <= "${fmtD(e)}")
       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
     } ORDER BY ?date LIMIT 8`;
 
