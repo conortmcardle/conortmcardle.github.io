@@ -85,15 +85,12 @@ a:hover {
   right: 0;
   height: var(--nav-height);
   z-index: 1000;
-  background: rgba(254, 252, 247, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--color-warm-white);
   border-bottom: 1px solid rgba(59, 47, 47, 0.08);
-  transition: background 0.3s ease, box-shadow 0.3s ease;
+  transition: box-shadow 0.3s ease;
 }
 
 .main-nav.scrolled {
-  background: rgba(254, 252, 247, 0.97);
   box-shadow: 0 2px 20px var(--color-shadow);
 }
 
@@ -178,7 +175,7 @@ a:hover {
   align-items: center;
   justify-content: center;
   text-align: center;
-  background-image: url('images/home/outdoor_works_010.311132123_std.jpg');
+  background-image: url('images/biography/Hero.548496643_10163426153110813_4981002950303559528_n.jpg');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
@@ -762,9 +759,7 @@ body::before {
     top: var(--nav-height);
     left: 0;
     right: 0;
-    background: rgba(254, 252, 247, 0.98);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: var(--color-warm-white);
     flex-direction: column;
     padding: 1.5rem 2rem;
     gap: 0;
