@@ -274,9 +274,15 @@
 .panel-green,
 .panel-orange,
 .panel-blue,
-.panel-purple {
+.panel-purple,
+.panel-teal,
+.panel-rose,
+.panel-lime {
   border: none;
 }
+
+/* Games panel spans full width so it doesn't leave an orphaned empty cell */
+#panel-games-wrap { grid-column: 1 / -1; }
 
 .panel-title {
   font-family: var(--font-sans);
@@ -380,12 +386,18 @@
 
 /* ── Concurrent Releases Panel ───────────────────────────── */
 .concurrent-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.8rem 0;
   border-bottom: 1px solid var(--border);
 }
 
 .concurrent-item:first-child { padding-top: 0; }
 .concurrent-item:last-child  { border-bottom: none; }
+
+.concurrent-info { flex: 1; min-width: 0; }
 
 .concurrent-title {
   font-family: var(--font-sans);
@@ -571,6 +583,151 @@
 .movie-info {
   flex: 1;
   min-width: 0;
+}
+
+/* ── Preview Button & Audio Player ──────────────────────── */
+.preview-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+
+.preview-btn:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.preview-btn:disabled { opacity: 0.5; cursor: default; }
+
+.preview-section {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.preview-audio {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  height: 36px;
+  border-radius: 8px;
+}
+
+/* ── Books Panel ─────────────────────────────────────────── */
+.book-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.book-item:first-child { padding-top: 0; }
+.book-item:last-child  { border-bottom: none; }
+
+.book-cover {
+  flex-shrink: 0;
+  width: 44px;
+  height: 62px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.book-info { flex: 1; min-width: 0; }
+
+.book-title {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.1rem;
+}
+
+.book-author {
+  font-size: 0.8rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ── Broadway Panel ──────────────────────────────────────── */
+.broadway-item {
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.broadway-item:first-child { padding-top: 0; }
+.broadway-item:last-child  { border-bottom: none; }
+
+.broadway-title {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.1rem;
+}
+
+.broadway-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+/* ── Video Games Panel ───────────────────────────────────── */
+.game-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.game-item:first-child { padding-top: 0; }
+.game-item:last-child  { border-bottom: none; }
+
+.game-img {
+  flex-shrink: 0;
+  width: 80px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.game-info { flex: 1; min-width: 0; }
+
+.game-title {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.1rem;
+}
+
+.game-genre {
+  font-size: 0.8rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.game-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
 }
 
 /* ── Utility ─────────────────────────────────────────────── */
