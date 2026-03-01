@@ -432,7 +432,7 @@ function detail(label, value) {
     </div>`;
 }
 
-function renderSongPanel(rec, release, wikiData) {
+function renderSongPanel(rec, release, wikiData, itunesTrack = null) {
   let html = '';
 
   const rgId = release?.['release-group']?.id;
@@ -460,6 +460,16 @@ function renderSongPanel(rec, release, wikiData) {
     if (wikiData.content_urls?.desktop?.page) {
       html += `<a class="wiki-link" href="${escHtml(wikiData.content_urls.desktop.page)}" target="_blank" rel="noopener">Read on Wikipedia →</a>`;
     }
+  }
+
+  if (itunesTrack?.previewUrl) {
+    html += `
+      <div class="preview-section">
+        <div class="detail-label">PREVIEW</div>
+        <audio class="preview-audio" controls preload="none">
+          <source src="${escHtml(itunesTrack.previewUrl)}" type="audio/mp4">
+        </audio>
+      </div>`;
   }
 
   setHTML('panel-song-body', html || '<p class="no-data">No details available.</p>');
@@ -889,21 +899,12 @@ async function selectRecording(rec) {
   // Fire each fetch independently; render each panel as soon as its data arrives
   const hasFullDate = date?.year && date?.month && date?.day;
 
-  getSongWiki(title, artistName)
-    .then(d => { renderSongPanel(rec, release, d); tickProgress(); });
-
-  // Best-effort iTunes preview — appended to the song panel when ready, no progress tick
-  getItunesPreview(title, artistName).then(track => {
-    if (!track?.previewUrl) return;
-    const body = el('panel-song-body');
-    if (!body || body.querySelector('.preview-section')) return;
-    body.insertAdjacentHTML('beforeend', `
-      <div class="preview-section">
-        <div class="detail-label">PREVIEW</div>
-        <audio class="preview-audio" controls preload="none">
-          <source src="${escHtml(track.previewUrl)}" type="audio/mp4">
-        </audio>
-      </div>`);
+  Promise.all([
+    getSongWiki(title, artistName),
+    getItunesPreview(title, artistName),
+  ]).then(([wikiData, itunesTrack]) => {
+    renderSongPanel(rec, release, wikiData, itunesTrack);
+    tickProgress();
   });
 
   if (date?.year && date?.month && date?.day) {
