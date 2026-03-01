@@ -840,6 +840,8 @@ function resetPanelsForDate() {
 }
 
 async function selectDate(year, month, day) {
+  const pad = n => String(n).padStart(2, '0');
+  history.replaceState(null, '', `?date=${year}-${pad(month)}-${pad(day)}`);
   hide('picker-section');
   show('results-section');
   resetPanelsForDate();
@@ -875,6 +877,7 @@ function resetPanels() {
 }
 
 async function selectRecording(rec) {
+  history.replaceState(null, '', `?song=${encodeURIComponent(rec.id)}`);
   const title      = rec.title;
   const credit     = rec['artist-credit']?.[0];
   const artistName = credit?.artist?.name ?? 'Unknown';
@@ -953,6 +956,7 @@ async function selectRecording(rec) {
 }
 
 async function selectReleaseGroup(rg) {
+  history.replaceState(null, '', `?album=${encodeURIComponent(rg.id)}`);
   const credit     = rg['artist-credit']?.[0];
   const artistName = credit?.artist?.name ?? 'Unknown';
   const artistId   = credit?.artist?.id ?? null;
@@ -1022,6 +1026,7 @@ async function selectReleaseGroup(rg) {
 
 function goToSearch() {
   stopCurrentPreview();
+  history.replaceState(null, '', window.location.pathname);
   hide('picker-section');
   hide('results-section');
   el('search-section').scrollIntoView({ behavior: 'smooth' });
@@ -1149,3 +1154,27 @@ el('panel-concurrent-body').addEventListener('click', async e => {
   if (!btn) return;
   await playPreview(btn, btn.dataset.title, btn.dataset.artist);
 });
+
+// ── Deep-link / shareable URL boot ────────────────────────────────────────────
+// Reads ?song=<id>, ?album=<id>, or ?date=YYYY-MM-DD on page load and
+// auto-loads the result so shared links and bookmarks work.
+(async function initFromUrl() {
+  const p = new URLSearchParams(window.location.search);
+
+  if (p.has('song')) {
+    const rec = await mbFetch(
+      `/recording/${encodeURIComponent(p.get('song'))}?fmt=json&inc=releases+artist-credits+release-groups`
+    );
+    if (rec?.id) selectRecording(rec);
+
+  } else if (p.has('album')) {
+    const rg = await mbFetch(
+      `/release-group/${encodeURIComponent(p.get('album'))}?fmt=json&inc=artist-credits`
+    );
+    if (rg?.id) selectReleaseGroup(rg);
+
+  } else if (p.has('date')) {
+    const parsed = parseTextDate(p.get('date'));
+    if (parsed) selectDate(parsed.year, parsed.month, parsed.day);
+  }
+})();
