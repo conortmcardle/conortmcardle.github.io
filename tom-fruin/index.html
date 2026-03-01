@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tom Fruin Studio</title>
+  <meta name="description" content="Sculptures, installations, and objects by Tom Fruin. Brooklyn-based artist transforming salvaged plexiglass and steel into luminous architectural monuments." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <script type="module" crossorigin src="/tom-fruin/assets/main-CRGAfaiM.js"></script>
+  <link rel="stylesheet" crossorigin href="/tom-fruin/assets/main-D2-6c6Sx.css">
+</head>
+<body>
+
+  <!-- Custom Cursor -->
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-follower" id="cursorFollower"></div>
+
+  <!-- Preloader -->
+  <div class="preloader" id="preloader">
+    <div class="preloader-inner">
+      <div class="preloader-shards">
+        <span style="--i:0; --c:#E63946;"></span>
+        <span style="--i:1; --c:#457B9D;"></span>
+        <span style="--i:2; --c:#F4A261;"></span>
+        <span style="--i:3; --c:#2A9D8F;"></span>
+        <span style="--i:4; --c:#E76F51;"></span>
+      </div>
+      <p class="preloader-text">Tom Fruin Studio</p>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <header class="header" id="header">
+    <a href="/tom-fruin/" class="header-logo">
+      <img src="/tom-fruin/images/logo.png" alt="Tom Fruin" class="header-logo-img" />
+    </a>
+    <nav class="header-nav" id="headerNav">
+      <a href="#work" class="nav-link">Work</a>
+      <a href="#about" class="nav-link">About</a>
+      <a href="#exhibitions" class="nav-link">Exhibitions</a>
+      <a href="/tom-fruin/shop.html" class="nav-link">Shop</a>
+      <a href="#contact" class="nav-link">Contact</a>
+    </nav>
+    <a href="https://www.instagram.com/tomfruin/" target="_blank" rel="noopener" class="header-ig">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/></svg>
+    </a>
+    <button class="header-menu-btn" id="menuBtn" aria-label="Menu">
+      <span></span><span></span>
+    </button>
+  </header>
+
+  <!-- Mobile Menu Overlay -->
+  <div class="mobile-menu" id="mobileMenu">
+    <nav class="mobile-menu-nav">
+      <a href="#work" class="mobile-link">Work</a>
+      <a href="#about" class="mobile-link">About</a>
+      <a href="#exhibitions" class="mobile-link">Exhibitions</a>
+      <a href="/tom-fruin/shop.html" class="mobile-link">Shop</a>
+      <a href="#contact" class="mobile-link">Contact</a>
+    </nav>
+    <div class="mobile-menu-footer">
+      <a href="https://www.instagram.com/tomfruin/" target="_blank" rel="noopener">Instagram</a>
+      <a href="mailto:tom@tomfruin.com">tom@tomfruin.com</a>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-visual">
+      <div class="hero-image-wrap" data-speed="0.8">
+        <img src="/tom-fruin/images/watertower1.jpg" alt="Watertower sculpture — DUMBO, Brooklyn with Manhattan Bridge" class="hero-image" />
+        <div class="hero-image-tint"></div>
+      </div>
+    </div>
+    <div class="hero-content">
+      <h1 class="hero-title" data-animate="split">
+        <span class="hero-line"><span class="hero-line-inner">Sculptures in</span></span>
+        <span class="hero-line"><span class="hero-line-inner"><em>light</em> &amp; steel</span></span>
+      </h1>
+      <div class="hero-meta">
+        <p class="hero-meta-text">Brooklyn, NY</p>
+        <span class="hero-meta-divider"></span>
+        <p class="hero-meta-text">Est. 1996</p>
+      </div>
+    </div>
+    <div class="hero-scroll">
+      <span class="hero-scroll-text">Scroll</span>
+      <span class="hero-scroll-line"></span>
+    </div>
+  </section>
+
+  <!-- Marquee -->
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track">
+      <span>Watertower</span>
+      <span class="marquee-dot"></span>
+      <span>Kolonihavehus</span>
+      <span class="marquee-dot"></span>
+      <span>Bombora House</span>
+      <span class="marquee-dot"></span>
+      <span>Camouflage House</span>
+      <span class="marquee-dot"></span>
+      <span>Windmill</span>
+      <span class="marquee-dot"></span>
+      <span>Kaleidoscope</span>
+      <span class="marquee-dot"></span>
+      <span>Streetcar</span>
+      <span class="marquee-dot"></span>
+      <span>Watertower</span>
+      <span class="marquee-dot"></span>
+      <span>Kolonihavehus</span>
+      <span class="marquee-dot"></span>
+      <span>Bombora House</span>
+      <span class="marquee-dot"></span>
+      <span>Camouflage House</span>
+      <span class="marquee-dot"></span>
+      <span>Windmill</span>
+      <span class="marquee-dot"></span>
+      <span>Kaleidoscope</span>
+      <span class="marquee-dot"></span>
+      <span>Streetcar</span>
+      <span class="marquee-dot"></span>
+    </div>
+  </div>
+
+  <!-- Work -->
+  <section class="section" id="work">
+    <div class="section-header">
+      <span class="section-label" data-reveal>Selected Work</span>
+      <h2 class="section-heading" data-reveal>Salvaged plexiglass,<br/>quilted steel, <em>infinite light</em></h2>
+    </div>
+
+    <div class="masonry" id="masonry">
+
+      <a href="/tom-fruin/work/watertower.html" class="masonry-item size-lg" data-reveal>
+        <div class="masonry-img">
+          <img src="/tom-fruin/images/watertower-hero.jpg" alt="Watertower — DUMBO, Brooklyn" loading="lazy" />
+        </div>
+        <div class="masonry-caption">
+          <h3>Watertower</h3>
+          <span>2012 — DUMBO, Brooklyn</span>
+        </div>
+      </a>
+
+      <a href="/tom-fruin/work/kolonihavehus.html" class="masonry-item size-md" data-reveal>
+        <div class="masonry-img">
+          <img src="/tom-fruin/images/work-kolonihavehus.jpg" alt="Kolonihavehus — Icon series" loading="lazy" />
+        </div>
+        <div class="masonry-caption">
+          <h3>Kolonihavehus</h3>
+          <span>2010 &ndash; Present</span>
+        </div>
+      </a>
+
+      <a href="/tom-fruin/work/flame.html" class="masonry-item size-sm" data-reveal>
+        <div class="masonry-img">
+          <img src="/tom-fruin/images/flame-detail.jpg" alt="Flame — stained glass detail" loading="lazy" />
+        </div>
+        <div class="masonry-caption">
+          <h3>Flame</h3>
+          <span>2014 — Brooklyn, NY</span>
+        </div>
+      </a>
+
+      <a href="/tom-fruin/work/watertower.html" class="masonry-item size-md" data-reveal>
+        <div class="masonry-img">
+          <img src="/tom-fruin/images/watertower-5.jpg" alt="Watertower at sunset" loading="lazy" />
+        </div>
+        <div class="masonry-caption">
+          <h3>Watertower (Sunset)</h3>
+          <span>2012 — LED by Ryan Holsopple</span>
+        </div>
+      </a>
+
+      <a href="#" class="masonry-item size-xl" data-reveal>
+        <div class="masonry-img">
+          <img src="/tom-fruin/images/hero-crown-of-foshan.webp" alt="Crown of Foshan — Shanghai, China" loading="lazy" />
+        </div>
+        <div class="masonry-caption">
+          <h3>Crown of Foshan</h3>
+          <span>2023 — Shanghai, China</span>
+        </div>
+      </a>
+
+      <a href="#" class="masonry-item size-sm" data-reveal>
+        <div class="masonry-img">
+          <img src="/tom-fruin/images/hotel.jpg" alt="Hotel — Wythe Hotel, Brooklyn" loading="lazy" />
+        </div>
+        <div class="masonry-caption">
+          <h3>Hotel</h3>
+          <span>2012 — Wythe Hotel, Brooklyn</span>
+        </div>
+      </a>
+
+      <a href="/tom-fruin/work/flame.html" class="masonry-item size-lg" data-reveal>
+        <div class="masonry-img">
+          <img src="/tom-fruin/images/flame-wide.jpg" alt="Flame — wide view" loading="lazy" />
+        </div>
+        <div class="masonry-caption">
+          <h3>Flame (Liberty Torch)</h3>
+          <span>2014 — Stained glass &amp; steel</span>
+        </div>
+      </a>
+
+      <a href="/tom-fruin/work/kolonihavehus.html" class="masonry-item size-md" data-reveal>
+        <div class="masonry-img">
+          <img src="/tom-fruin/images/kolonihavehus-copenhagen-night.png" alt="Kolonihavehus at night in Copenhagen" loading="lazy" />
+        </div>
+        <div class="masonry-caption">
+          <h3>Kolonihavehus (Night)</h3>
+          <span>Copenhagen, Denmark</span>
+        </div>
+      </a>
+
+    </div>
+  </section>
+
+  <!-- Interstitial Quote -->
+  <section class="interstitial">
+    <blockquote class="big-quote" data-reveal>
+      <p>&ldquo;I like to place these works in the public realm to upend people&rsquo;s expectations of their surroundings.&rdquo;</p>
+      <cite>&mdash; Tom Fruin</cite>
+    </blockquote>
+  </section>
+
+  <!-- About -->
+  <section class="section about-section" id="about">
+    <div class="about-layout">
+      <div class="about-portrait" data-reveal>
+        <img src="/tom-fruin/images/portrait.jpg" alt="Tom Fruin with Watertower sculpture" loading="lazy" />
+      </div>
+      <div class="about-content">
+        <span class="section-label" data-reveal>About the Artist</span>
+        <h2 class="about-heading" data-reveal>Tom Fruin</h2>
+        <div class="about-bio" data-reveal>
+          <p>Born in Los Angeles in 1974, Tom Fruin creates large-scale sculpture and installations using reclaimed materials &mdash; quilted steel, salvaged plexiglass, and found objects.</p>
+          <p>After graduating from UC Santa Barbara in 1996, he relocated to New York City, establishing his studio in the Gowanus neighborhood of Brooklyn, where he continues to live and work.</p>
+          <p>His monumental works take the form of urban architectural icons &mdash; water towers, houses, windmills, flags, and streetcars &mdash; elevated into luminous, kaleidoscopic monuments. By day, sunlight passing through colored panels casts prismatic shadows. At night, Arduino-programmed LED lighting transforms each piece into a glowing beacon.</p>
+          <p>His works are held in collections including The Brooklyn Museum, Museum Kunstpalast (D&uuml;sseldorf), the MTA Arts &amp; Design Permanent Collection, and the U.S. Department of State Art in Embassies program.</p>
+        </div>
+        <div class="about-stats" data-reveal>
+          <div class="stat">
+            <span class="stat-num">25+</span>
+            <span class="stat-label">Years Active</span>
+          </div>
+          <div class="stat">
+            <span class="stat-num">40+</span>
+            <span class="stat-label">Permanent Installations</span>
+          </div>
+          <div class="stat">
+            <span class="stat-num">15</span>
+            <span class="stat-label">Countries</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Exhibitions -->
+  <section class="section" id="exhibitions">
+    <div class="section-header">
+      <span class="section-label" data-reveal>Exhibitions</span>
+      <h2 class="section-heading" data-reveal>Around the world,<br/><em>permanently</em></h2>
+    </div>
+
+    <div class="ex-grid">
+      <div class="ex-col ex-col-permanent">
+        <h3 class="ex-col-title" data-reveal>Permanent Installations</h3>
+
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2023</span>
+          <div><strong>Crown of Foshan</strong><br/><span class="ex-place">Shanghai, China</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2023</span>
+          <div><strong>Watertower 10</strong><br/><span class="ex-place">Beppu City, Japan</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2023</span>
+          <div><strong>Sign Pop</strong><br/><span class="ex-place">Dime Bank, NYC</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2023</span>
+          <div><strong>Streetcar</strong><br/><span class="ex-place">Chevy Chase, MD</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2021</span>
+          <div><strong>Kaleidoscope</strong><br/><span class="ex-place">Cincinnati Children&rsquo;s Hospital</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2019</span>
+          <div><strong>Sail</strong><br/><span class="ex-place">MTA &middot; Long Island, NY</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2019</span>
+          <div><strong>Watertower 8</strong><br/><span class="ex-place">Oakland, CA</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2018</span>
+          <div><strong>Watertank</strong><br/><span class="ex-place">One Broadway at MIT, Cambridge</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2018</span>
+          <div><strong>Gates</strong><br/><span class="ex-place">The Belt Alley, Detroit</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2017</span>
+          <div><strong>Windmill</strong><br/><span class="ex-place">Clearfork, Ft. Worth, TX</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2016</span>
+          <div><strong>Lakehouse</strong><br/><span class="ex-place">Lake Nona, FL</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2014</span>
+          <div><strong>Watertower 3</strong><br/><span class="ex-place">Brooklyn Bridge Park</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2012</span>
+          <div><strong>Watertower</strong><br/><span class="ex-place">20 Jay St, DUMBO, Brooklyn</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2012</span>
+          <div><strong>Hotel</strong><br/><span class="ex-place">The Wythe Hotel, Brooklyn</span></div>
+        </article>
+      </div>
+
+      <div class="ex-col ex-col-recent">
+        <h3 class="ex-col-title" data-reveal>Recent</h3>
+
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2024</span>
+          <div><strong>Kyle Bunting Collab</strong><br/><span class="ex-place">Austin, TX</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2023</span>
+          <div><strong>Enchanted Forest of Light</strong><br/><span class="ex-place">Descanso Gardens, LA</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2022</span>
+          <div><strong>Food in New York</strong><br/><span class="ex-place">Museum of the City of NY</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2022</span>
+          <div><strong>From Sea to Shining Sea</strong><br/><span class="ex-place">Pier 17, South Street Seaport</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2020</span>
+          <div><strong>Bombora House</strong><br/><span class="ex-place">Gansevoort Plaza, NYC</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2019</span>
+          <div><strong>Camouflage House</strong><br/><span class="ex-place">Hudson Yards, NYC</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2017</span>
+          <div><strong>Tom Fruin: Empire</strong><br/><span class="ex-place">Galerie Curtze, Vienna</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2016</span>
+          <div><strong>Fresh Produce</strong><br/><span class="ex-place">Paul Loya Gallery, LA</span></div>
+        </article>
+        <article class="ex-row" data-reveal>
+          <span class="ex-date">2014</span>
+          <div><strong>Color Study</strong><br/><span class="ex-place">Mike Weiss Gallery, NYC</span></div>
+        </article>
+      </div>
+    </div>
+
+    <div class="ex-press-strip" data-reveal>
+      <p>Featured in <em>The New York Times</em>, <em>Architectural Digest</em>, <em>The Guardian</em>, <em>Wallpaper*</em>, <em>HYPEBEAST</em>, <em>Colossal</em>, and more.</p>
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section class="section contact-section" id="contact">
+    <div class="contact-layout">
+      <div class="contact-left">
+        <span class="section-label" data-reveal>Get in Touch</span>
+        <h2 class="contact-heading" data-reveal>Let&rsquo;s make<br/><em>something</em></h2>
+        <a href="mailto:tom@tomfruin.com" class="contact-email" data-reveal>tom@tomfruin.com</a>
+      </div>
+      <div class="contact-right" data-reveal>
+        <div class="contact-block">
+          <h4>Studio</h4>
+          <p>Gowanus, Brooklyn, NY</p>
+        </div>
+        <div class="contact-block">
+          <h4>Social</h4>
+          <a href="https://www.instagram.com/tomfruin/" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://www.artsy.net/artist/tom-fruin" target="_blank" rel="noopener">Artsy</a>
+        </div>
+        <div class="contact-block">
+          <h4>Representation</h4>
+          <a href="https://www.caldwellsnyder.com/artists/tom-fruin" target="_blank" rel="noopener">Caldwell Snyder Gallery</a>
+          <a href="https://www.samuelowen.com/artists/66-tom-fruin/" target="_blank" rel="noopener">Samuel Owen Gallery</a>
+          <a href="https://avantgallery.com/collections/tom-fruin" target="_blank" rel="noopener">Avant Gallery</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>&copy; 2026 Tom Fruin</span>
+      <span>Brooklyn, New York</span>
+    </div>
+  </footer>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" aria-label="Close">&times;</button>
+    <img class="lightbox-img" src="" alt="" />
+    <div class="lightbox-info"></div>
+  </div>
+
+</body>
+</html>
