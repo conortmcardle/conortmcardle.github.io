@@ -277,12 +277,10 @@
 .panel-purple,
 .panel-teal,
 .panel-rose,
-.panel-lime {
+.panel-lime,
+.panel-yellow {
   border: none;
 }
-
-/* Games panel spans full width so it doesn't leave an orphaned empty cell */
-#panel-games-wrap { grid-column: 1 / -1; }
 
 .panel-title {
   font-family: var(--font-sans);
@@ -624,6 +622,59 @@
   margin-top: 0.5rem;
   height: 36px;
   border-radius: 8px;
+}
+
+/* ── Charts Panel ────────────────────────────────────────── */
+.chart-year-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.75rem;
+}
+
+.chart-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-item:first-of-type { padding-top: 0; }
+.chart-item:last-child    { border-bottom: none; }
+
+.chart-pos {
+  flex-shrink: 0;
+  width: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: right;
+}
+
+.chart-info { flex: 1; min-width: 0; }
+
+.chart-title {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chart-artist {
+  font-size: 0.775rem;
+  color: var(--text-muted);
+  margin-top: 0.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Books Panel ─────────────────────────────────────────── */
