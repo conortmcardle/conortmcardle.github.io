@@ -216,6 +216,13 @@ async function getMovieReleases(year, month, day) {
   }));
 }
 
+async function getBillboardYearEnd(year) {
+  const page = `Billboard_Year-End_Hot_100_singles_of_${year}`;
+  return safeFetch(
+    `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(page)}&prop=text&format=json&origin=*`
+  );
+}
+
 async function getItunesPreview(title, artist) {
   const term = encodeURIComponent(`${title} ${artist}`);
   const data = await safeFetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=5&media=music`);
@@ -669,6 +676,44 @@ function renderMoviePanel(data) {
   setHTML('panel-movies-body', html || '<p class="no-data">No movies found for this date.</p>');
 }
 
+function renderBillboardPanel(data, year) {
+  const noData = () => setHTML('panel-charts-body', '<p class="no-data">No chart data available for this year.</p>');
+
+  const raw = data?.parse?.text?.['*'];
+  if (!raw) { noData(); return; }
+
+  const doc   = new DOMParser().parseFromString(raw, 'text/html');
+  const table = doc.querySelector('.wikitable');
+  if (!table) { noData(); return; }
+
+  const entries = [];
+  for (const row of Array.from(table.querySelectorAll('tr')).slice(1)) {
+    const cells = Array.from(row.querySelectorAll('td, th'));
+    if (cells.length < 3) continue;
+    const clean  = s => s.textContent.trim().replace(/\[.*?\]/g, '').trim();
+    const pos    = clean(cells[0]);
+    const title  = clean(cells[1]);
+    const artist = clean(cells[2]);
+    if (!pos || !title) continue;
+    entries.push({ pos, title, artist });
+    if (entries.length >= 20) break;
+  }
+
+  if (!entries.length) { noData(); return; }
+
+  const html = `<p class="chart-year-label">Billboard Year-End, ${year}</p>` +
+    entries.map(e => `
+      <div class="chart-item">
+        <div class="chart-pos">${escHtml(e.pos)}</div>
+        <div class="chart-info">
+          <div class="chart-title">${escHtml(e.title)}</div>
+          <div class="chart-artist">${escHtml(e.artist)}</div>
+        </div>
+      </div>`).join('');
+
+  setHTML('panel-charts-body', html);
+}
+
 function renderBookPanel(data) {
   if (!data?.docs?.length) {
     setHTML('panel-books-body', '<p class="no-data">No books found for this period.</p>');
@@ -833,10 +878,10 @@ function resetPanelsForDate() {
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'MUSIC THIS WEEK';
   ['panel-history-body', 'panel-concurrent-body', 'panel-tv-body', 'panel-movies-body',
-   'panel-books-body', 'panel-broadway-body', 'panel-games-body'].forEach(id => {
+   'panel-books-body', 'panel-broadway-body', 'panel-charts-body', 'panel-games-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
-  initProgress(7);
+  initProgress(8);
 }
 
 async function selectDate(year, month, day) {
@@ -860,6 +905,8 @@ async function selectDate(year, month, day) {
     .then(d => { renderBookPanel(d);                   tickProgress(); });
   getBroadwayShows(year, month, day)
     .then(d => { renderBroadwayPanel(d);               tickProgress(); });
+  getBillboardYearEnd(year)
+    .then(d => { renderBillboardPanel(d, year);        tickProgress(); });
   getGameReleases(year, month, day)
     .then(d => { renderGamePanel(d);                   tickProgress(); });
 }
@@ -870,10 +917,11 @@ function resetPanels() {
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'WHAT ELSE DROPPED';
   ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body',
-   'panel-tv-body', 'panel-movies-body', 'panel-books-body', 'panel-broadway-body', 'panel-games-body'].forEach(id => {
+   'panel-tv-body', 'panel-movies-body', 'panel-books-body', 'panel-broadway-body',
+   'panel-charts-body', 'panel-games-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
-  initProgress(9);
+  initProgress(10);
 }
 
 async function selectRecording(rec) {
@@ -939,10 +987,12 @@ async function selectRecording(rec) {
   }
 
   if (date?.year) {
-    getBookReleases(date.year).then(d => { renderBookPanel(d); tickProgress(); });
+    getBookReleases(date.year).then(d => { renderBookPanel(d);            tickProgress(); });
+    getBillboardYearEnd(date.year).then(d => { renderBillboardPanel(d, date.year); tickProgress(); });
   } else {
     renderBookPanel(null);
-    tickProgress();
+    renderBillboardPanel(null, 0);
+    tickProgress(); tickProgress();
   }
 
   // Artist panel needs both MB + Wikipedia; wait for both together
@@ -1009,10 +1059,12 @@ async function selectReleaseGroup(rg) {
   }
 
   if (date?.year) {
-    getBookReleases(date.year).then(d => { renderBookPanel(d); tickProgress(); });
+    getBookReleases(date.year).then(d => { renderBookPanel(d);            tickProgress(); });
+    getBillboardYearEnd(date.year).then(d => { renderBillboardPanel(d, date.year); tickProgress(); });
   } else {
     renderBookPanel(null);
-    tickProgress();
+    renderBillboardPanel(null, 0);
+    tickProgress(); tickProgress();
   }
 
   Promise.all([
