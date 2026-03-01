@@ -5,7 +5,7 @@
 const MB_API      = 'https://musicbrainz.org/ws/2';
 const WIKI_API    = 'https://en.wikipedia.org/api/rest_v1';
 const TMDB_TOKEN  = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIwYzk3Y2ZmNGE2NDY5MWM5NTgxNjgzMzNmNWJjZGQyMyIsIm5iZiI6MTUxMzAxNzA4OC40NzksInN1YiI6IjVhMmVjZjAwOTI1MTQxMDMyYzE2OTAwOCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.TsyvP2XLtoS-QMCAVaLUF4MpONaDoK61-z4CXYjz2N0';
-const RAWG_KEY    = ''; // Free key at https://rawg.io/apidocs
+const RAWG_KEY    = 'a77b22ae1ccd47dcade106c14cade25a';
 const MB_HEADERS  = { 'User-Agent': 'WhenItDropped/1.0 (https://conortmcardle.github.io)' };
 
 // ── DOM Helpers ───────────────────────────────────────────────────────────────
