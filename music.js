@@ -7,7 +7,9 @@ const WIKI_API    = 'https://en.wikipedia.org/api/rest_v1';
 const TMDB_TOKEN  = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIwYzk3Y2ZmNGE2NDY5MWM5NTgxNjgzMzNmNWJjZGQyMyIsIm5iZiI6MTUxMzAxNzA4OC40NzksInN1YiI6IjVhMmVjZjAwOTI1MTQxMDMyYzE2OTAwOCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.TsyvP2XLtoS-QMCAVaLUF4MpONaDoK61-z4CXYjz2N0';
 const RAWG_KEY    = 'a77b22ae1ccd47dcade106c14cade25a';
 const MB_HEADERS  = { 'User-Agent': 'WhenItDropped/1.0 (https://conortmcardle.github.io)' };
-const MET_API     = 'https://collectionapi.metmuseum.org/public/collection/v1';
+const MET_API      = 'https://collectionapi.metmuseum.org/public/collection/v1';
+const GUARDIAN_KEY = 'test'; // replace with a key from open-platform.theguardian.com
+const NYT_KEY      = null;   // add your key from developer.nytimes.com
 
 // ── DOM Helpers ───────────────────────────────────────────────────────────────
 
@@ -247,6 +249,29 @@ async function getMetArtwork(year) {
   let results = await tryRange(year, year);
   if (results.length < 3) results = await tryRange(year - 5, year + 5);
   return results.slice(0, 6);
+}
+
+async function getGuardianHeadlines(year, month, day) {
+  const pad  = n => String(n).padStart(2, '0');
+  const c    = new Date(Date.UTC(year, month - 1, day));
+  const from = new Date(c); from.setUTCDate(from.getUTCDate() - 3);
+  const to   = new Date(c); to.setUTCDate(to.getUTCDate() + 3);
+  const fmtD = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  return safeFetch(
+    `https://content.guardianapis.com/search?from-date=${fmtD(from)}&to-date=${fmtD(to)}&order-by=newest&page-size=8&show-fields=headline,thumbnail&api-key=${GUARDIAN_KEY}`
+  );
+}
+
+async function getNYTHeadlines(year, month, day) {
+  if (!NYT_KEY) return null;
+  const pad  = n => String(n).padStart(2, '0');
+  const c    = new Date(Date.UTC(year, month - 1, day));
+  const from = new Date(c); from.setUTCDate(from.getUTCDate() - 3);
+  const to   = new Date(c); to.setUTCDate(to.getUTCDate() + 3);
+  const fmtD = d => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
+  return safeFetch(
+    `https://api.nytimes.com/svc/search/v2/articlesearch.json?begin_date=${fmtD(from)}&end_date=${fmtD(to)}&sort=newest&api-key=${NYT_KEY}`
+  );
 }
 
 async function getTVPremieres(year, month, day) {
@@ -948,6 +973,61 @@ function renderMetPanel(objects) {
   setHTML('panel-met-body', html);
 }
 
+function renderGuardianPanel(data) {
+  const results = data?.response?.results;
+  if (!results?.length) { hide('panel-guardian-wrap'); return; }
+
+  const html = results.map(a => {
+    const headline = a.fields?.headline || a.webTitle || '';
+    const thumb    = a.fields?.thumbnail || '';
+    const section  = a.sectionName || '';
+    const date     = a.webPublicationDate?.split('T')[0] || '';
+    const imgHtml  = thumb
+      ? `<a href="${escHtml(a.webUrl)}" target="_blank" rel="noopener"><img class="news-thumb" src="${escHtml(thumb)}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`
+      : '';
+    return `
+      <div class="news-item">
+        ${imgHtml}
+        <div class="news-info">
+          <div class="news-title"><a class="media-link" href="${escHtml(a.webUrl)}" target="_blank" rel="noopener">${escHtml(headline)}</a></div>
+          ${section ? `<div class="news-section">${escHtml(section)}</div>` : ''}
+          ${date    ? `<div class="news-date">${escHtml(formatDate(date))}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  setHTML('panel-guardian-body', html);
+}
+
+function renderNYTPanel(data) {
+  if (!NYT_KEY) { hide('panel-nyt-wrap'); return; }
+  const docs = data?.response?.docs;
+  if (!docs?.length) { hide('panel-nyt-wrap'); return; }
+
+  const html = docs.slice(0, 8).map(a => {
+    const headline = a.headline?.main || a.headline?.print_headline || '';
+    const section  = a.section_name || a.news_desk || '';
+    const date     = a.pub_date?.split('T')[0] || '';
+    const thumb    = a.multimedia?.find(m => m.subtype === 'thumbnail');
+    const thumbUrl = thumb ? `https://www.nytimes.com/${thumb.url}` : '';
+    const imgHtml  = thumbUrl
+      ? `<a href="${escHtml(a.web_url)}" target="_blank" rel="noopener"><img class="news-thumb" src="${escHtml(thumbUrl)}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`
+      : '';
+    return `
+      <div class="news-item">
+        ${imgHtml}
+        <div class="news-info">
+          <div class="news-title"><a class="media-link" href="${escHtml(a.web_url)}" target="_blank" rel="noopener">${escHtml(headline)}</a></div>
+          ${section ? `<div class="news-section">${escHtml(section)}</div>` : ''}
+          ${date    ? `<div class="news-date">${escHtml(formatDate(date))}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  if (!html) { hide('panel-nyt-wrap'); return; }
+  setHTML('panel-nyt-body', html);
+}
+
 // ── iTunes Preview ─────────────────────────────────────────────────────────────
 
 let _previewAudio = null;
@@ -1022,15 +1102,15 @@ function resetPanelsForDate() {
   el('panel-artist-wrap').hidden = true;
   ['panel-history-wrap', 'panel-concurrent-wrap', 'panel-tv-wrap', 'panel-movies-wrap',
    'panel-books-wrap', 'panel-broadway-wrap', 'panel-charts-wrap', 'panel-games-wrap',
-   'panel-met-wrap'].forEach(show);
+   'panel-met-wrap', 'panel-guardian-wrap', 'panel-nyt-wrap'].forEach(show);
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'MUSIC THIS WEEK';
   ['panel-history-body', 'panel-concurrent-body', 'panel-tv-body', 'panel-movies-body',
    'panel-books-body', 'panel-broadway-body', 'panel-charts-body', 'panel-games-body',
-   'panel-met-body'].forEach(id => {
+   'panel-met-body', 'panel-guardian-body', 'panel-nyt-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
-  initProgress(9);
+  initProgress(11);
 }
 
 async function selectDate(year, month, day) {
@@ -1060,6 +1140,10 @@ async function selectDate(year, month, day) {
     .then(d => { renderGamePanel(d);                   tickProgress(); });
   getMetArtwork(year)
     .then(d => { renderMetPanel(d);                    tickProgress(); });
+  getGuardianHeadlines(year, month, day)
+    .then(d => { renderGuardianPanel(d);               tickProgress(); });
+  getNYTHeadlines(year, month, day)
+    .then(d => { renderNYTPanel(d);                    tickProgress(); });
 }
 
 function resetPanels() {
@@ -1067,15 +1151,16 @@ function resetPanels() {
   el('panel-artist-wrap').hidden = false;
   ['panel-history-wrap', 'panel-concurrent-wrap', 'panel-tv-wrap', 'panel-movies-wrap',
    'panel-books-wrap', 'panel-broadway-wrap', 'panel-charts-wrap', 'panel-games-wrap',
-   'panel-met-wrap'].forEach(show);
+   'panel-met-wrap', 'panel-guardian-wrap', 'panel-nyt-wrap'].forEach(show);
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'WHAT ELSE DROPPED';
   ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body',
    'panel-tv-body', 'panel-movies-body', 'panel-books-body', 'panel-broadway-body',
-   'panel-charts-body', 'panel-games-body', 'panel-met-body'].forEach(id => {
+   'panel-charts-body', 'panel-games-body', 'panel-met-body',
+   'panel-guardian-body', 'panel-nyt-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
-  initProgress(11);
+  initProgress(13);
 }
 
 async function selectRecording(rec) {
@@ -1131,10 +1216,16 @@ async function selectRecording(rec) {
       .then(d => { renderBroadwayPanel(d);                       tickProgress(); });
     getGameReleases(date.year, date.month, date.day)
       .then(d => { renderGamePanel(d);                           tickProgress(); });
+    getGuardianHeadlines(date.year, date.month, date.day)
+      .then(d => { renderGuardianPanel(d);                       tickProgress(); });
+    getNYTHeadlines(date.year, date.month, date.day)
+      .then(d => { renderNYTPanel(d);                            tickProgress(); });
   } else if (date?.year) {
     // Year-only: TV and Movies need exact dates so hide them; the rest fall back to year-level.
-    renderTVPanel(null);    tickProgress();
-    renderMoviePanel(null); tickProgress();
+    renderTVPanel(null);       tickProgress();
+    renderMoviePanel(null);    tickProgress();
+    renderGuardianPanel(null); tickProgress();
+    renderNYTPanel(null);      tickProgress();
     getConcurrentReleasesByYear(date.year)
       .then(d => { renderConcurrentPanel(d, title, artistName); tickProgress(); });
     getBroadwayShowsByYear(date.year)
@@ -1145,7 +1236,9 @@ async function selectRecording(rec) {
     renderConcurrentPanel(null, title, artistName);
     renderTVPanel(null); renderMoviePanel(null);
     renderBroadwayPanel(null); renderGamePanel(null);
+    renderGuardianPanel(null); renderNYTPanel(null);
     tickProgress(); tickProgress(); tickProgress(); tickProgress(); tickProgress();
+    tickProgress(); tickProgress();
   }
 
   if (date?.year) {
@@ -1213,9 +1306,15 @@ async function selectReleaseGroup(rg) {
       .then(d => { renderBroadwayPanel(d);                          tickProgress(); });
     getGameReleases(date.year, date.month, date.day)
       .then(d => { renderGamePanel(d);                              tickProgress(); });
+    getGuardianHeadlines(date.year, date.month, date.day)
+      .then(d => { renderGuardianPanel(d);                          tickProgress(); });
+    getNYTHeadlines(date.year, date.month, date.day)
+      .then(d => { renderNYTPanel(d);                               tickProgress(); });
   } else if (date?.year) {
-    renderTVPanel(null);    tickProgress();
-    renderMoviePanel(null); tickProgress();
+    renderTVPanel(null);       tickProgress();
+    renderMoviePanel(null);    tickProgress();
+    renderGuardianPanel(null); tickProgress();
+    renderNYTPanel(null);      tickProgress();
     getConcurrentReleasesByYear(date.year)
       .then(d => { renderConcurrentPanel(d, rg.title, artistName); tickProgress(); });
     getBroadwayShowsByYear(date.year)
@@ -1226,7 +1325,9 @@ async function selectReleaseGroup(rg) {
     renderConcurrentPanel(null, rg.title, artistName);
     renderTVPanel(null); renderMoviePanel(null);
     renderBroadwayPanel(null); renderGamePanel(null);
+    renderGuardianPanel(null); renderNYTPanel(null);
     tickProgress(); tickProgress(); tickProgress(); tickProgress(); tickProgress();
+    tickProgress(); tickProgress();
   }
 
   if (date?.year) {
