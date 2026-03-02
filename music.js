@@ -204,19 +204,22 @@ async function getConcurrentReleases(year, month, day) {
   const pad = n => String(n).padStart(2, '0');
   const dateStr = `${year}-${pad(month)}-${pad(day)}`;
   const q = `date:${dateStr} AND status:Official`;
-  const path = `/release?query=${encodeURIComponent(q)}&fmt=json&limit=25&inc=artist-credits`;
+  const path = `/release?query=${encodeURIComponent(q)}&fmt=json&limit=25&inc=artist-credits+release-groups`;
   return mbFetch(path);
 }
 
 async function getConcurrentReleasesByYear(year) {
   const q = `date:${year} AND status:Official`;
-  return mbFetch(`/release?query=${encodeURIComponent(q)}&fmt=json&limit=25&inc=artist-credits`);
+  return mbFetch(`/release?query=${encodeURIComponent(q)}&fmt=json&limit=25&inc=artist-credits+release-groups`);
 }
 
 async function getBroadwayShowsByYear(year) {
   const sparql = `
     SELECT DISTINCT ?show ?showLabel ?date WHERE {
       ?show wdt:P1191 ?date.
+      ?show wdt:P161 [].
+      FILTER NOT EXISTS { ?show wdt:P31/wdt:P279* wd:Q11424 }
+      FILTER NOT EXISTS { ?show wdt:P31/wdt:P279* wd:Q5398426 }
       BIND(SUBSTR(str(?date), 1, 4) AS ?yearStr)
       FILTER(?yearStr = "${year}")
       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
@@ -235,19 +238,24 @@ async function getGameReleasesByYear(year) {
 }
 
 async function getMetArtwork(year) {
-  const tryRange = async (begin, end) => {
+  const tryRange = async (begin, end, highlight = false) => {
+    const extra  = highlight ? '&isHighlight=true' : '';
     const search = await safeFetch(
-      `${MET_API}/search?hasImages=true&dateBegin=${begin}&dateEnd=${end}&q=art`
+      `${MET_API}/search?hasImages=true&dateBegin=${begin}&dateEnd=${end}&q=art${extra}`
     );
     if (!search?.objectIDs?.length) return [];
-    // Fetch first 12 object details in parallel; keep those with thumbnail images
-    const ids     = search.objectIDs.slice(0, 12);
+    // Highlights are curated so we need fewer candidates; use 9 otherwise.
+    const ids     = search.objectIDs.slice(0, highlight ? 6 : 9);
     const objects = await Promise.all(ids.map(id => safeFetch(`${MET_API}/objects/${id}`)));
     return objects.filter(o => o?.primaryImageSmall);
   };
 
-  let results = await tryRange(year, year);
-  if (results.length < 3) results = await tryRange(year - 5, year + 5);
+  // 1. Try curated highlights for the exact year (fastest, highest quality)
+  let results = await tryRange(year, year, true);
+  // 2. Fall back to all objects for the exact year
+  if (results.length < 3) results = await tryRange(year, year, false);
+  // 3. Widen range ±5 years
+  if (results.length < 3) results = await tryRange(year - 5, year + 5, false);
   return results.slice(0, 6);
 }
 
@@ -368,9 +376,14 @@ async function getBroadwayShows(year, month, day) {
 
   // P1191 = "date of first performance". Use SUBSTR to compare just the YYYY-MM-DD
   // portion — avoids xsd:dateTime vs "YYYY-MM-DDT00:00:00Z" mismatch in Wikidata.
+  // Require P161 (cast member) to filter out speeches and non-theatrical items;
+  // exclude films (Q11424) and TV series (Q5398426) which also have casts.
   const sparql = `
     SELECT DISTINCT ?show ?showLabel ?date WHERE {
       ?show wdt:P1191 ?date.
+      ?show wdt:P161 [].
+      FILTER NOT EXISTS { ?show wdt:P31/wdt:P279* wd:Q11424 }
+      FILTER NOT EXISTS { ?show wdt:P31/wdt:P279* wd:Q5398426 }
       BIND(SUBSTR(str(?date), 1, 10) AS ?dateStr)
       FILTER(?dateStr >= "${fmtD(s)}" && ?dateStr <= "${fmtD(e)}")
       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
@@ -713,8 +726,12 @@ function renderConcurrentPanel(data, currentTitle, artistName, maxItems = 8) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  // Sort by MusicBrainz score descending — higher score = more prominent release
-  }).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, maxItems);
+  // Sort albums before singles/EPs; use MusicBrainz score as tiebreaker
+  }).sort((a, b) => {
+    const ta = releaseTypeScore(a), tb = releaseTypeScore(b);
+    if (ta !== tb) return ta - tb;
+    return (b.score ?? 0) - (a.score ?? 0);
+  }).slice(0, maxItems);
 
   if (!releases.length) {
     hide('panel-concurrent-wrap');
@@ -724,10 +741,14 @@ function renderConcurrentPanel(data, currentTitle, artistName, maxItems = 8) {
   const html = releases.map(r => {
     const artist  = r['artist-credit']?.[0]?.artist?.name ?? 'Unknown';
     const dateStr = r.date ? formatDate(r.date) : '';
+    const mbUrl   = r.id ? `https://musicbrainz.org/release/${r.id}` : '';
+    const titleHtml = mbUrl
+      ? `<a class="media-link" href="${escHtml(mbUrl)}" target="_blank" rel="noopener">${escHtml(r.title)}</a>`
+      : escHtml(r.title);
     return `
       <div class="concurrent-item">
         <div class="concurrent-info">
-          <div class="concurrent-title">${escHtml(r.title)}</div>
+          <div class="concurrent-title">${titleHtml}</div>
           <div class="concurrent-artist">${escHtml(artist)}</div>
           ${dateStr ? `<div class="concurrent-date">${escHtml(dateStr)}</div>` : ''}
         </div>
