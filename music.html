@@ -33,15 +33,27 @@
       </div>
       <form id="search-form" class="search-form">
         <div class="search-fields">
-          <input type="text" id="song-input" placeholder="Song title" autocomplete="off" required />
-          <input type="text" id="artist-input" placeholder="Artist" autocomplete="off" required />
+          <div class="input-wrap">
+            <input type="text" id="song-input" placeholder="Song title" autocomplete="off" required />
+            <div class="suggestions" id="sug-song"></div>
+          </div>
+          <div class="input-wrap">
+            <input type="text" id="artist-input" placeholder="Artist" autocomplete="off" required />
+            <div class="suggestions" id="sug-artist"></div>
+          </div>
           <button type="submit" class="btn btn-primary">GO</button>
         </div>
       </form>
       <form id="album-form" class="search-form" hidden>
         <div class="search-fields">
-          <input type="text" id="album-input" placeholder="Album title" autocomplete="off" required />
-          <input type="text" id="album-artist-input" placeholder="Artist" autocomplete="off" required />
+          <div class="input-wrap">
+            <input type="text" id="album-input" placeholder="Album title" autocomplete="off" required />
+            <div class="suggestions" id="sug-album"></div>
+          </div>
+          <div class="input-wrap">
+            <input type="text" id="album-artist-input" placeholder="Artist" autocomplete="off" required />
+            <div class="suggestions" id="sug-album-artist"></div>
+          </div>
           <button type="submit" class="btn btn-primary">GO</button>
         </div>
       </form>

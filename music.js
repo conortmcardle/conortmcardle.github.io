@@ -142,6 +142,57 @@ async function searchReleaseGroups(title, artist) {
   return mbFetch(path);
 }
 
+// ── Autocomplete / Fuzzy Search ───────────────────────────────────────────────
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+async function mbSuggestRecordings(title) {
+  const data = await mbFetch(`/recording?query=recording:${encodeURIComponent(title)}*&fmt=json&limit=6`);
+  return data?.recordings ?? [];
+}
+
+async function mbSuggestArtists(query) {
+  const data = await mbFetch(`/artist?query=artist:${encodeURIComponent(query)}*&fmt=json&limit=6`);
+  return data?.artists ?? [];
+}
+
+async function mbSuggestAlbums(title) {
+  const data = await mbFetch(`/release-group?query=releasegroup:${encodeURIComponent(title)}*&fmt=json&limit=6`);
+  return data?.['release-groups'] ?? [];
+}
+
+async function fuzzySearchRecordings(title, artist) {
+  const q = artist ? `${title} ${artist}` : title;
+  const data = await mbFetch(`/recording?query=${encodeURIComponent(q)}&fmt=json&limit=3&inc=releases+artist-credits`);
+  return data?.recordings ?? [];
+}
+
+async function fuzzySearchAlbums(title, artist) {
+  const q = artist ? `${title} ${artist}` : title;
+  const data = await mbFetch(`/release-group?query=${encodeURIComponent(q)}&fmt=json&limit=3&inc=artist-credits`);
+  return data?.['release-groups'] ?? [];
+}
+
+function renderSuggestions(dropId, items, onSelect) {
+  const drop = el(dropId);
+  if (!drop || !items.length) { if (drop) drop.innerHTML = ''; return; }
+  drop.innerHTML = items.map((item, i) => `
+    <div class="suggestion-item" data-i="${i}">
+      <div class="sug-main">${escHtml(item.main)}</div>
+      ${item.sub ? `<div class="sug-sub">${escHtml(item.sub)}</div>` : ''}
+    </div>`).join('');
+  drop.querySelectorAll('.suggestion-item').forEach(row => {
+    row.addEventListener('mousedown', e => {
+      e.preventDefault();
+      onSelect(parseInt(row.dataset.i, 10));
+      drop.innerHTML = '';
+    });
+  });
+}
+
 async function getArtistDetails(artistId) {
   return mbFetch(`/artist/${artistId}?fmt=json`);
 }
@@ -333,9 +384,23 @@ async function getSongWiki(title, artistName) {
 
 // ── Renderers ─────────────────────────────────────────────────────────────────
 
-function renderPicker(recordings) {
+function renderPicker(recordings, didYouMean = null) {
   if (!recordings?.length) {
-    setHTML('picker-list', '<p class="no-data">No songs found — try adjusting your search.</p>');
+    let html = '<p class="no-data">No songs found — try adjusting your search.</p>';
+    if (didYouMean) {
+      const t = didYouMean.title;
+      const a = didYouMean['artist-credit']?.[0]?.artist?.name ?? '';
+      html += `<p class="did-you-mean">Did you mean <button class="dym-btn" id="dym-btn">${escHtml(t)}${a ? ` – ${escHtml(a)}` : ''}</button>?</p>`;
+    }
+    setHTML('picker-list', html);
+    if (didYouMean) {
+      el('dym-btn').addEventListener('click', () => {
+        el('song-input').value = didYouMean.title;
+        const a = didYouMean['artist-credit']?.[0]?.artist?.name ?? '';
+        if (a) el('artist-input').value = a;
+        el('search-form').requestSubmit();
+      });
+    }
     return;
   }
 
@@ -385,9 +450,23 @@ function renderPicker(recordings) {
   });
 }
 
-function renderAlbumPicker(groups) {
+function renderAlbumPicker(groups, didYouMean = null) {
   if (!groups?.length) {
-    setHTML('picker-list', '<p class="no-data">No albums found — try adjusting your search.</p>');
+    let html = '<p class="no-data">No albums found — try adjusting your search.</p>';
+    if (didYouMean) {
+      const t = didYouMean.title;
+      const a = didYouMean['artist-credit']?.[0]?.artist?.name ?? '';
+      html += `<p class="did-you-mean">Did you mean <button class="dym-btn" id="dym-btn">${escHtml(t)}${a ? ` – ${escHtml(a)}` : ''}</button>?</p>`;
+    }
+    setHTML('picker-list', html);
+    if (didYouMean) {
+      el('dym-btn').addEventListener('click', () => {
+        el('album-input').value = didYouMean.title;
+        const a = didYouMean['artist-credit']?.[0]?.artist?.name ?? '';
+        if (a) el('album-artist-input').value = a;
+        el('album-form').requestSubmit();
+      });
+    }
     return;
   }
 
@@ -1101,7 +1180,13 @@ el('search-form').addEventListener('submit', async e => {
   el('picker-section').scrollIntoView({ behavior: 'smooth' });
 
   const data = await searchRecordings(title, artist);
-  renderPicker(data?.recordings ?? []);
+  const recordings = data?.recordings ?? [];
+  if (!recordings.length) {
+    const fuzzy = await fuzzySearchRecordings(title, artist);
+    renderPicker([], fuzzy[0] ?? null);
+  } else {
+    renderPicker(recordings);
+  }
 });
 
 el('album-form').addEventListener('submit', async e => {
@@ -1118,7 +1203,13 @@ el('album-form').addEventListener('submit', async e => {
   el('picker-section').scrollIntoView({ behavior: 'smooth' });
 
   const data = await searchReleaseGroups(title, artist);
-  renderAlbumPicker(data?.['release-groups'] ?? []);
+  const groups = data?.['release-groups'] ?? [];
+  if (!groups.length) {
+    const fuzzy = await fuzzySearchAlbums(title, artist);
+    renderAlbumPicker([], fuzzy[0] ?? null);
+  } else {
+    renderAlbumPicker(groups);
+  }
 });
 
 el('back-btn').addEventListener('click', goToSearch);
@@ -1206,6 +1297,67 @@ el('panel-concurrent-body').addEventListener('click', async e => {
   if (!btn) return;
   await playPreview(btn, btn.dataset.title, btn.dataset.artist);
 });
+
+// ── Autocomplete Event Listeners ──────────────────────────────────────────────
+
+function attachAutocomplete(inputId, sugId, fetchFn, mapFn, onSelectFn) {
+  const input = el(inputId);
+  const drop  = el(sugId);
+  input.addEventListener('input', debounce(async () => {
+    const val = input.value.trim();
+    if (val.length < 2) { drop.innerHTML = ''; return; }
+    const results = await fetchFn(val);
+    renderSuggestions(sugId, results.map(mapFn), i => onSelectFn(results[i]));
+  }, 300));
+  input.addEventListener('blur', () => setTimeout(() => { drop.innerHTML = ''; }, 150));
+}
+
+// Deduplicate suggestions by lowercase title to avoid identical rows.
+function dedupByTitle(items) {
+  const seen = new Set();
+  return items.filter(x => {
+    const k = x.title.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+attachAutocomplete(
+  'song-input', 'sug-song',
+  mbSuggestRecordings,
+  r => ({ main: r.title, sub: r['artist-credit']?.[0]?.artist?.name ?? '' }),
+  r => {
+    el('song-input').value = r.title;
+    const a = r['artist-credit']?.[0]?.artist?.name ?? '';
+    if (a && !el('artist-input').value) el('artist-input').value = a;
+  }
+);
+
+attachAutocomplete(
+  'artist-input', 'sug-artist',
+  mbSuggestArtists,
+  a => ({ main: a.name, sub: a.disambiguation ?? '' }),
+  a => { el('artist-input').value = a.name; }
+);
+
+attachAutocomplete(
+  'album-input', 'sug-album',
+  mbSuggestAlbums,
+  g => ({ main: g.title, sub: g['artist-credit']?.[0]?.artist?.name ?? '' }),
+  g => {
+    el('album-input').value = g.title;
+    const a = g['artist-credit']?.[0]?.artist?.name ?? '';
+    if (a && !el('album-artist-input').value) el('album-artist-input').value = a;
+  }
+);
+
+attachAutocomplete(
+  'album-artist-input', 'sug-album-artist',
+  mbSuggestArtists,
+  a => ({ main: a.name, sub: a.disambiguation ?? '' }),
+  a => { el('album-artist-input').value = a.name; }
+);
 
 // ── Deep-link / shareable URL boot ────────────────────────────────────────────
 // Reads ?song=<id>, ?album=<id>, or ?date=YYYY-MM-DD on page load and
