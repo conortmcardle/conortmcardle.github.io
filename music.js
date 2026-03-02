@@ -205,6 +205,32 @@ async function getConcurrentReleases(year, month, day) {
   return mbFetch(path);
 }
 
+async function getConcurrentReleasesByYear(year) {
+  const q = `date:${year} AND status:Official`;
+  return mbFetch(`/release?query=${encodeURIComponent(q)}&fmt=json&limit=25&inc=artist-credits`);
+}
+
+async function getBroadwayShowsByYear(year) {
+  const sparql = `
+    SELECT DISTINCT ?show ?showLabel ?date WHERE {
+      ?show wdt:P1191 ?date.
+      BIND(SUBSTR(str(?date), 1, 4) AS ?yearStr)
+      FILTER(?yearStr = "${year}")
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+    } ORDER BY ?date LIMIT 8`;
+  return safeFetch(
+    `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`,
+    { headers: { Accept: 'application/sparql-results+json' } }
+  );
+}
+
+async function getGameReleasesByYear(year) {
+  if (!RAWG_KEY) return null;
+  return safeFetch(
+    `https://api.rawg.io/api/games?key=${RAWG_KEY}&dates=${year}-01-01,${year}-12-31&ordering=-rating&page_size=8`
+  );
+}
+
 async function getTVPremieres(year, month, day) {
   const pad    = n => String(n).padStart(2, '0');
   const center = new Date(Date.UTC(year, month - 1, day));
@@ -588,7 +614,7 @@ function renderAlbumPanel(rg, wikiData) {
 
 function renderHistoryPanel(data, releaseYear) {
   if (!data || !releaseYear) {
-    setHTML('panel-history-body', '<p class="no-data">No historical events found for this period.</p>');
+    hide('panel-history-wrap');
     return;
   }
 
@@ -616,7 +642,7 @@ function renderHistoryPanel(data, releaseYear) {
   ].slice(0, 4);
 
   if (!events.length) {
-    setHTML('panel-history-body', '<p class="no-data">No historical events found for this period.</p>');
+    hide('panel-history-wrap');
     return;
   }
 
@@ -631,7 +657,7 @@ function renderHistoryPanel(data, releaseYear) {
 
 function renderConcurrentPanel(data, currentTitle, artistName, maxItems = 8) {
   if (!data?.releases?.length) {
-    setHTML('panel-concurrent-body', '<p class="no-data">No concurrent releases found.</p>');
+    hide('panel-concurrent-wrap');
     return;
   }
 
@@ -648,7 +674,7 @@ function renderConcurrentPanel(data, currentTitle, artistName, maxItems = 8) {
   }).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, maxItems);
 
   if (!releases.length) {
-    setHTML('panel-concurrent-body', '<p class="no-data">No other releases found in this period.</p>');
+    hide('panel-concurrent-wrap');
     return;
   }
 
@@ -671,7 +697,7 @@ function renderConcurrentPanel(data, currentTitle, artistName, maxItems = 8) {
 
 function renderTVPanel(data) {
   if (!Array.isArray(data) || !data.length) {
-    setHTML('panel-tv-body', '<p class="no-data">No TV premieres found for this date.</p>');
+    hide('panel-tv-wrap');
     return;
   }
 
@@ -685,7 +711,7 @@ function renderTVPanel(data) {
   }).sort((a, b) => (a.airdate ?? '').localeCompare(b.airdate ?? '')).slice(0, 8);
 
   if (!premieres.length) {
-    setHTML('panel-tv-body', '<p class="no-data">No TV premieres found for this date.</p>');
+    hide('panel-tv-wrap');
     return;
   }
 
@@ -723,7 +749,7 @@ function renderTVPanel(data) {
 
 function renderMoviePanel(data) {
   if (!Array.isArray(data) || !data.length) {
-    setHTML('panel-movies-body', '<p class="no-data">No movies found for this date.</p>');
+    hide('panel-movies-wrap');
     return;
   }
 
@@ -752,11 +778,12 @@ function renderMoviePanel(data) {
       </div>`;
   }).join('');
 
-  setHTML('panel-movies-body', html || '<p class="no-data">No movies found for this date.</p>');
+  if (!html) { hide('panel-movies-wrap'); return; }
+  setHTML('panel-movies-body', html);
 }
 
 function renderBillboardPanel(data, year) {
-  const noData = () => setHTML('panel-charts-body', '<p class="no-data">No chart data available for this year.</p>');
+  const noData = () => hide('panel-charts-wrap');
 
   const raw = data?.parse?.text?.['*'];
   if (!raw) { noData(); return; }
@@ -795,7 +822,7 @@ function renderBillboardPanel(data, year) {
 
 function renderBookPanel(data) {
   if (!data?.docs?.length) {
-    setHTML('panel-books-body', '<p class="no-data">No books found for this period.</p>');
+    hide('panel-books-wrap');
     return;
   }
 
@@ -815,13 +842,14 @@ function renderBookPanel(data) {
       </div>`;
   }).join('');
 
-  setHTML('panel-books-body', html || '<p class="no-data">No books found for this period.</p>');
+  if (!html) { hide('panel-books-wrap'); return; }
+  setHTML('panel-books-body', html);
 }
 
 function renderBroadwayPanel(data) {
   const bindings = data?.results?.bindings;
   if (!bindings?.length) {
-    setHTML('panel-broadway-body', '<p class="no-data">No theatrical productions found for this period.</p>');
+    hide('panel-broadway-wrap');
     return;
   }
 
@@ -834,7 +862,7 @@ function renderBroadwayPanel(data) {
   });
 
   if (!shows.length) {
-    setHTML('panel-broadway-body', '<p class="no-data">No theatrical productions found for this period.</p>');
+    hide('panel-broadway-wrap');
     return;
   }
 
@@ -856,12 +884,8 @@ function renderBroadwayPanel(data) {
 }
 
 function renderGamePanel(data) {
-  if (!RAWG_KEY) {
-    setHTML('panel-games-body', '<p class="no-data">Add a free <a class="wiki-link" href="https://rawg.io/apidocs" target="_blank" rel="noopener">RAWG API key</a> in music.js to enable this panel.</p>');
-    return;
-  }
-  if (!data?.results?.length) {
-    setHTML('panel-games-body', '<p class="no-data">No video game releases found for this period.</p>');
+  if (!RAWG_KEY || !data?.results?.length) {
+    hide('panel-games-wrap');
     return;
   }
 
@@ -954,6 +978,8 @@ function renderDateHeader(year, month, day) {
 function resetPanelsForDate() {
   el('panel-song-wrap').hidden   = true;
   el('panel-artist-wrap').hidden = true;
+  ['panel-history-wrap', 'panel-concurrent-wrap', 'panel-tv-wrap', 'panel-movies-wrap',
+   'panel-books-wrap', 'panel-broadway-wrap', 'panel-charts-wrap', 'panel-games-wrap'].forEach(show);
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'MUSIC THIS WEEK';
   ['panel-history-body', 'panel-concurrent-body', 'panel-tv-body', 'panel-movies-body',
@@ -993,6 +1019,8 @@ async function selectDate(year, month, day) {
 function resetPanels() {
   el('panel-song-wrap').hidden   = false;
   el('panel-artist-wrap').hidden = false;
+  ['panel-history-wrap', 'panel-concurrent-wrap', 'panel-tv-wrap', 'panel-movies-wrap',
+   'panel-books-wrap', 'panel-broadway-wrap', 'panel-charts-wrap', 'panel-games-wrap'].forEach(show);
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'WHAT ELSE DROPPED';
   ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body',
@@ -1056,12 +1084,20 @@ async function selectRecording(rec) {
       .then(d => { renderBroadwayPanel(d);                       tickProgress(); });
     getGameReleases(date.year, date.month, date.day)
       .then(d => { renderGamePanel(d);                           tickProgress(); });
+  } else if (date?.year) {
+    // Year-only: TV and Movies need exact dates so hide them; the rest fall back to year-level.
+    renderTVPanel(null);    tickProgress();
+    renderMoviePanel(null); tickProgress();
+    getConcurrentReleasesByYear(date.year)
+      .then(d => { renderConcurrentPanel(d, title, artistName); tickProgress(); });
+    getBroadwayShowsByYear(date.year)
+      .then(d => { renderBroadwayPanel(d);                       tickProgress(); });
+    getGameReleasesByYear(date.year)
+      .then(d => { renderGamePanel(d);                           tickProgress(); });
   } else {
     renderConcurrentPanel(null, title, artistName);
-    renderTVPanel(null);
-    renderMoviePanel(null);
-    renderBroadwayPanel(null);
-    renderGamePanel(null);
+    renderTVPanel(null); renderMoviePanel(null);
+    renderBroadwayPanel(null); renderGamePanel(null);
     tickProgress(); tickProgress(); tickProgress(); tickProgress(); tickProgress();
   }
 
@@ -1128,12 +1164,19 @@ async function selectReleaseGroup(rg) {
       .then(d => { renderBroadwayPanel(d);                          tickProgress(); });
     getGameReleases(date.year, date.month, date.day)
       .then(d => { renderGamePanel(d);                              tickProgress(); });
+  } else if (date?.year) {
+    renderTVPanel(null);    tickProgress();
+    renderMoviePanel(null); tickProgress();
+    getConcurrentReleasesByYear(date.year)
+      .then(d => { renderConcurrentPanel(d, rg.title, artistName); tickProgress(); });
+    getBroadwayShowsByYear(date.year)
+      .then(d => { renderBroadwayPanel(d);                          tickProgress(); });
+    getGameReleasesByYear(date.year)
+      .then(d => { renderGamePanel(d);                              tickProgress(); });
   } else {
     renderConcurrentPanel(null, rg.title, artistName);
-    renderTVPanel(null);
-    renderMoviePanel(null);
-    renderBroadwayPanel(null);
-    renderGamePanel(null);
+    renderTVPanel(null); renderMoviePanel(null);
+    renderBroadwayPanel(null); renderGamePanel(null);
     tickProgress(); tickProgress(); tickProgress(); tickProgress(); tickProgress();
   }
 
