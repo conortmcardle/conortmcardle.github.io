@@ -7,9 +7,7 @@ const WIKI_API    = 'https://en.wikipedia.org/api/rest_v1';
 const TMDB_TOKEN  = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIwYzk3Y2ZmNGE2NDY5MWM5NTgxNjgzMzNmNWJjZGQyMyIsIm5iZiI6MTUxMzAxNzA4OC40NzksInN1YiI6IjVhMmVjZjAwOTI1MTQxMDMyYzE2OTAwOCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.TsyvP2XLtoS-QMCAVaLUF4MpONaDoK61-z4CXYjz2N0';
 const RAWG_KEY    = 'a77b22ae1ccd47dcade106c14cade25a';
 const MB_HEADERS  = { 'User-Agent': 'WhenItDropped/1.0 (https://conortmcardle.github.io)' };
-const MET_API      = 'https://collectionapi.metmuseum.org/public/collection/v1';
 const GUARDIAN_KEY = 'test'; // replace with a key from open-platform.theguardian.com
-const NYT_KEY      = null;   // add your key from developer.nytimes.com
 
 // ── DOM Helpers ───────────────────────────────────────────────────────────────
 
@@ -237,28 +235,6 @@ async function getGameReleasesByYear(year) {
   );
 }
 
-async function getMetArtwork(year) {
-  const tryRange = async (begin, end, highlight = false) => {
-    const extra  = highlight ? '&isHighlight=true' : '';
-    const search = await safeFetch(
-      `${MET_API}/search?hasImages=true&dateBegin=${begin}&dateEnd=${end}&q=art${extra}`
-    );
-    if (!search?.objectIDs?.length) return [];
-    // Highlights are curated so we need fewer candidates; use 9 otherwise.
-    const ids     = search.objectIDs.slice(0, highlight ? 6 : 9);
-    const objects = await Promise.all(ids.map(id => safeFetch(`${MET_API}/objects/${id}`)));
-    return objects.filter(o => o?.primaryImageSmall);
-  };
-
-  // 1. Try curated highlights for the exact year (fastest, highest quality)
-  let results = await tryRange(year, year, true);
-  // 2. Fall back to all objects for the exact year
-  if (results.length < 3) results = await tryRange(year, year, false);
-  // 3. Widen range ±5 years
-  if (results.length < 3) results = await tryRange(year - 5, year + 5, false);
-  return results.slice(0, 6);
-}
-
 async function getGuardianHeadlines(year, month, day) {
   const pad  = n => String(n).padStart(2, '0');
   const c    = new Date(Date.UTC(year, month - 1, day));
@@ -271,14 +247,17 @@ async function getGuardianHeadlines(year, month, day) {
 }
 
 async function getNYTHeadlines(year, month, day) {
-  if (!NYT_KEY) return null;
-  const pad  = n => String(n).padStart(2, '0');
-  const c    = new Date(Date.UTC(year, month - 1, day));
-  const from = new Date(c); from.setUTCDate(from.getUTCDate() - 3);
-  const to   = new Date(c); to.setUTCDate(to.getUTCDate() + 3);
-  const fmtD = d => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
+  // GDELT Doc 2.0 API — free, no key, indexes nytimes.com articles from ~2015 onwards.
+  const pad   = n => String(n).padStart(2, '0');
+  const c     = new Date(Date.UTC(year, month - 1, day));
+  const from  = new Date(c); from.setUTCDate(from.getUTCDate() - 2);
+  const to    = new Date(c); to.setUTCDate(to.getUTCDate() + 2);
+  const fmtDT = d =>
+    `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}000000`;
   return safeFetch(
-    `https://api.nytimes.com/svc/search/v2/articlesearch.json?begin_date=${fmtD(from)}&end_date=${fmtD(to)}&sort=newest&api-key=${NYT_KEY}`
+    `https://api.gdeltproject.org/api/v2/doc/doc?query=domain:nytimes.com%20sourcelang:english` +
+    `&mode=artlist&format=json&maxrecords=10&sort=datedesc` +
+    `&startdatetime=${fmtDT(from)}&enddatetime=${fmtDT(to)}`
   );
 }
 
@@ -970,30 +949,6 @@ function renderGamePanel(data) {
   setHTML('panel-games-body', html);
 }
 
-function renderMetPanel(objects) {
-  if (!objects?.length) {
-    hide('panel-met-wrap');
-    return;
-  }
-
-  const html = `<div class="met-grid">${objects.map(o => {
-    const url    = `https://www.metmuseum.org/art/collection/search/${o.objectID}`;
-    const artist = o.artistDisplayName || o.culture || o.dynasty || '';
-    const date   = o.objectDate || '';
-    return `
-      <div class="met-item">
-        <a href="${escHtml(url)}" target="_blank" rel="noopener">
-          <img class="met-img" src="${escHtml(o.primaryImageSmall)}" alt="${escHtml(o.title)}" loading="lazy" onerror="this.closest('.met-item').style.display='none'">
-        </a>
-        <div class="met-title" title="${escHtml(o.title)}">${escHtml(o.title)}</div>
-        ${artist ? `<div class="met-artist">${escHtml(artist)}</div>` : ''}
-        ${date   ? `<div class="met-date">${escHtml(date)}</div>`    : ''}
-      </div>`;
-  }).join('')}</div>`;
-
-  setHTML('panel-met-body', html);
-}
-
 function renderGuardianPanel(data) {
   const results = data?.response?.results;
   if (!results?.length) { hide('panel-guardian-wrap'); return; }
@@ -1021,26 +976,27 @@ function renderGuardianPanel(data) {
 }
 
 function renderNYTPanel(data) {
-  if (!NYT_KEY) { hide('panel-nyt-wrap'); return; }
-  const docs = data?.response?.docs;
-  if (!docs?.length) { hide('panel-nyt-wrap'); return; }
+  // GDELT response: { articles: [{ url, title, seendate, socialimage, domain }] }
+  const articles = data?.articles;
+  if (!articles?.length) { hide('panel-nyt-wrap'); return; }
 
-  const html = docs.slice(0, 8).map(a => {
-    const headline = a.headline?.main || a.headline?.print_headline || '';
-    const section  = a.section_name || a.news_desk || '';
-    const date     = a.pub_date?.split('T')[0] || '';
-    const thumb    = a.multimedia?.find(m => m.subtype === 'thumbnail');
-    const thumbUrl = thumb ? `https://www.nytimes.com/${thumb.url}` : '';
-    const imgHtml  = thumbUrl
-      ? `<a href="${escHtml(a.web_url)}" target="_blank" rel="noopener"><img class="news-thumb" src="${escHtml(thumbUrl)}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`
+  const html = articles.slice(0, 8).map(a => {
+    const title = a.title || '';
+    const url   = a.url   || '';
+    // seendate: "20230614T120000Z" → "2023-06-14"
+    const raw   = a.seendate ?? '';
+    const date  = raw.length >= 8
+      ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
+      : '';
+    const imgHtml = a.socialimage
+      ? `<a href="${escHtml(url)}" target="_blank" rel="noopener"><img class="news-thumb" src="${escHtml(a.socialimage)}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`
       : '';
     return `
       <div class="news-item">
         ${imgHtml}
         <div class="news-info">
-          <div class="news-title"><a class="media-link" href="${escHtml(a.web_url)}" target="_blank" rel="noopener">${escHtml(headline)}</a></div>
-          ${section ? `<div class="news-section">${escHtml(section)}</div>` : ''}
-          ${date    ? `<div class="news-date">${escHtml(formatDate(date))}</div>` : ''}
+          <div class="news-title">${url ? `<a class="media-link" href="${escHtml(url)}" target="_blank" rel="noopener">${escHtml(title)}</a>` : escHtml(title)}</div>
+          ${date ? `<div class="news-date">${escHtml(formatDate(date))}</div>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -1123,15 +1079,15 @@ function resetPanelsForDate() {
   el('panel-artist-wrap').hidden = true;
   ['panel-history-wrap', 'panel-concurrent-wrap', 'panel-tv-wrap', 'panel-movies-wrap',
    'panel-books-wrap', 'panel-broadway-wrap', 'panel-charts-wrap', 'panel-games-wrap',
-   'panel-met-wrap', 'panel-guardian-wrap', 'panel-nyt-wrap'].forEach(show);
+   'panel-guardian-wrap', 'panel-nyt-wrap'].forEach(show);
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'MUSIC THIS WEEK';
   ['panel-history-body', 'panel-concurrent-body', 'panel-tv-body', 'panel-movies-body',
    'panel-books-body', 'panel-broadway-body', 'panel-charts-body', 'panel-games-body',
-   'panel-met-body', 'panel-guardian-body', 'panel-nyt-body'].forEach(id => {
+   'panel-guardian-body', 'panel-nyt-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
-  initProgress(11);
+  initProgress(10);
 }
 
 async function selectDate(year, month, day) {
@@ -1159,8 +1115,6 @@ async function selectDate(year, month, day) {
     .then(d => { renderBillboardPanel(d, year);        tickProgress(); });
   getGameReleases(year, month, day)
     .then(d => { renderGamePanel(d);                   tickProgress(); });
-  getMetArtwork(year)
-    .then(d => { renderMetPanel(d);                    tickProgress(); });
   getGuardianHeadlines(year, month, day)
     .then(d => { renderGuardianPanel(d);               tickProgress(); });
   getNYTHeadlines(year, month, day)
@@ -1172,16 +1126,16 @@ function resetPanels() {
   el('panel-artist-wrap').hidden = false;
   ['panel-history-wrap', 'panel-concurrent-wrap', 'panel-tv-wrap', 'panel-movies-wrap',
    'panel-books-wrap', 'panel-broadway-wrap', 'panel-charts-wrap', 'panel-games-wrap',
-   'panel-met-wrap', 'panel-guardian-wrap', 'panel-nyt-wrap'].forEach(show);
+   'panel-guardian-wrap', 'panel-nyt-wrap'].forEach(show);
   el('panel-history-title').textContent    = 'ON THIS WEEK IN HISTORY';
   el('panel-concurrent-title').textContent = 'WHAT ELSE DROPPED';
   ['panel-song-body', 'panel-history-body', 'panel-concurrent-body', 'panel-artist-body',
    'panel-tv-body', 'panel-movies-body', 'panel-books-body', 'panel-broadway-body',
-   'panel-charts-body', 'panel-games-body', 'panel-met-body',
+   'panel-charts-body', 'panel-games-body',
    'panel-guardian-body', 'panel-nyt-body'].forEach(id => {
     setHTML(id, '<div class="loading">Loading…</div>');
   });
-  initProgress(13);
+  initProgress(12);
 }
 
 async function selectRecording(rec) {
@@ -1265,12 +1219,10 @@ async function selectRecording(rec) {
   if (date?.year) {
     getBookReleases(date.year).then(d => { renderBookPanel(d);            tickProgress(); });
     getBillboardYearEnd(date.year).then(d => { renderBillboardPanel(d, date.year); tickProgress(); });
-    getMetArtwork(date.year).then(d => { renderMetPanel(d);               tickProgress(); });
   } else {
     renderBookPanel(null);
     renderBillboardPanel(null, 0);
-    renderMetPanel([]);
-    tickProgress(); tickProgress(); tickProgress();
+    tickProgress(); tickProgress();
   }
 
   // Artist panel needs both MB + Wikipedia; wait for both together
@@ -1354,12 +1306,10 @@ async function selectReleaseGroup(rg) {
   if (date?.year) {
     getBookReleases(date.year).then(d => { renderBookPanel(d);            tickProgress(); });
     getBillboardYearEnd(date.year).then(d => { renderBillboardPanel(d, date.year); tickProgress(); });
-    getMetArtwork(date.year).then(d => { renderMetPanel(d);               tickProgress(); });
   } else {
     renderBookPanel(null);
     renderBillboardPanel(null, 0);
-    renderMetPanel([]);
-    tickProgress(); tickProgress(); tickProgress();
+    tickProgress(); tickProgress();
   }
 
   Promise.all([
