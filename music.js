@@ -976,32 +976,33 @@ function renderGuardianPanel(data) {
 }
 
 function renderNYTPanel(data) {
-  // GDELT response: { articles: [{ url, title, seendate, socialimage, domain }] }
   const articles = data?.articles;
   if (!articles?.length) { hide('panel-nyt-wrap'); return; }
 
   const html = articles.slice(0, 8).map(a => {
-    const title = a.title || '';
-    const url   = a.url   || '';
+    const title    = a.title || '';
+    const url      = a.url   || '';
     // seendate: "20230614T120000Z" → "2023-06-14"
-    const raw   = a.seendate ?? '';
-    const date  = raw.length >= 8
+    const raw      = a.seendate ?? '';
+    const date     = raw.length >= 8
       ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
       : '';
-    const imgHtml = a.socialimage
+    const imgHtml  = a.socialimage
       ? `<a href="${escHtml(url)}" target="_blank" rel="noopener"><img class="news-thumb" src="${escHtml(a.socialimage)}" alt="" loading="lazy" onerror="this.style.display='none'"></a>`
       : '';
+    const linkHtml = url
+      ? `<a class="media-link" href="${escHtml(url)}" target="_blank" rel="noopener">${escHtml(title)}</a>`
+      : escHtml(title);
     return `
       <div class="news-item">
         ${imgHtml}
         <div class="news-info">
-          <div class="news-title">${url ? `<a class="media-link" href="${escHtml(url)}" target="_blank" rel="noopener">${escHtml(title)}</a>` : escHtml(title)}</div>
+          <div class="news-title">${linkHtml}</div>
           ${date ? `<div class="news-date">${escHtml(formatDate(date))}</div>` : ''}
         </div>
       </div>`;
   }).join('');
 
-  if (!html) { hide('panel-nyt-wrap'); return; }
   setHTML('panel-nyt-body', html);
 }
 
